@@ -45,6 +45,87 @@ page 10 (
         }
     )
 
+    region check (
+        name: Compile Check
+        title: Compile check
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    l_html   clob;
+                    l_buffer varchar2(32767);
+                    l_errors pls_integer := 0;
+                    l_total  pls_integer := 0;
+                    l_module varchar2(255);
+
+                    procedure p (p_text in varchar2) is
+                    begin
+                        if nvl(lengthb(l_buffer), 0) + nvl(lengthb(p_text), 0) > 32000 then
+                            dbms_lob.writeappend(l_html, length(l_buffer), l_buffer);
+                            l_buffer := null;
+                        end if;
+                        l_buffer := l_buffer || p_text;
+                    end p;
+                begin
+                    dbms_lob.createtemporary(l_html, true);
+                    select count(*), count(case when c001 = 'ERROR' then 1 end)
+                      into l_total, l_errors
+                      from apex_collections
+                     where collection_name = 'RESTAURANT_CHECK';
+                    select max(name) into l_module from user_ords_modules where id = :P10_ID;
+                    p('<div class="rst-toolbar"><span class="rst-status rst-status--' || case when l_errors = 0 then 'on' else 'off' end || '">'
+                      || case
+                             when l_total = 0  then 'No handlers to check'
+                             when l_errors = 0 then 'All ' || l_total || ' handlers compile'
+                             else l_errors || ' of ' || l_total || ' handlers do not compile'
+                         end
+                      || '</span><span class="rst-muted">'
+                      || case when l_module is not null then 'Module ' || apex_escape.html(l_module) else 'All modules' end
+                      || ' · checked by the database without running the code</span></div>');
+                    if l_errors > 0 then
+                        p('<table class="rst-table"><thead><tr><th>Handler</th><th>Module</th><th>Position</th><th>Error</th></tr></thead><tbody>');
+                        for c in ( select c002 method, c003 path, c004 module_name, c005 message, n001 handler_id, n002 line, n003 col
+                                     from apex_collections
+                                    where collection_name = 'RESTAURANT_CHECK'
+                                      and c001 = 'ERROR'
+                                    order by seq_id )
+                        loop
+                            p('<tr><td><a class="rst-method rst-method--' || lower(apex_escape.html_attribute(c.method)) || '" href="'
+                              || apex_page.get_url(p_page => 13, p_items => 'P13_ID', p_values => c.handler_id) || '">' || apex_escape.html(c.method) || '</a> '
+                              || '<a class="rst-path" href="' || apex_page.get_url(p_page => 13, p_items => 'P13_ID', p_values => c.handler_id) || '">'
+                              || apex_escape.html(c.path) || '</a></td><td>' || apex_escape.html(c.module_name) || '</td>'
+                              || '<td class="rst-mono">' || case when c.line is not null then c.line || ':' || c.col end || '</td>'
+                              || '<td>' || apex_escape.html(c.message) || '</td></tr>');
+                        end loop;
+                        p('</tbody></table>');
+                    end if;
+                    if l_buffer is not null then
+                        dbms_lob.writeappend(l_html, length(l_buffer), l_buffer);
+                    end if;
+                    return l_html;
+                end;
+                ```
+        }
+        layout {
+            sequence: 15
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: [
+                #DEFAULT#
+                t-Region--noPadding
+                t-Region--scrollBody
+            ]
+        }
+        serverSideCondition {
+            type: item=value
+            item: P10_CHECK
+            value: Y
+        }
+    )
+
     region modules (
         name: Modules
         type: dynamicContent
@@ -124,6 +205,36 @@ page 10 (
         }
     )
 
+    pageItem P10_CHECK (
+        type: hidden
+        layout {
+            sequence: 10
+            region: @heading
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+        sessionState {
+            storage: request
+        }
+    )
+
+    pageItem P10_ID (
+        type: hidden
+        layout {
+            sequence: 20
+            region: @heading
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+        sessionState {
+            storage: request
+        }
+    )
+
     button create (
         buttonName: CREATE
         label: Create Module
@@ -175,6 +286,33 @@ page 10 (
         }
     )
 
+    button check (
+        buttonName: CHECK
+        label: Check Handlers
+        layout {
+            sequence: 17
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-check-circle-o
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 10
+                items: {
+                    P10_CHECK: Y
+                }
+            }
+        }
+    )
+
     button export (
         buttonName: EXPORT
         label: Export
@@ -222,6 +360,26 @@ page 10 (
                 page: 70
                 clearCache: 70
             }
+        }
+    )
+
+    process check-handlers (
+        name: Check Handlers
+        type: plugin/restaurantEngine
+        settings {
+            action: HANDLERS_CHECK
+        }
+        execution {
+            sequence: 10
+            point: beforeHeader
+        }
+        serverSideCondition {
+            type: item=value
+            item: P10_CHECK
+            value: Y
+        }
+        advanced {
+            executionMappingIdentifier: 1001
         }
     )
 

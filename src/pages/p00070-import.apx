@@ -145,6 +145,9 @@ page 70 (
             cssClasses: rst-code
             height: 12
         }
+        advanced {
+            customAttributes: data-rst-language="json"
+        }
         sessionState {
             dataType: clob
             storage: request

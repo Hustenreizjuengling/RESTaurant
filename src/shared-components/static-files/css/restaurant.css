@@ -275,3 +275,32 @@ a.rst-stat:hover, a.rst-stat:focus { border-color: var(--rst-accent); transform:
 .rst-about p { margin: 0; }
 .rst-try-output { max-height: 20rem; }
 .rst-try-response-headers { max-height: 10rem; margin-bottom: .5rem; }
+
+/* ---------- code editor and compile check ---------- */
+.rst-monaco {
+  width: 100%;
+  min-height: 12rem;
+  border: 1px solid var(--rst-border);
+  border-radius: 4px;
+  overflow: hidden;
+  resize: vertical;
+}
+.rst-code-source { display: none !important; }
+.rst-check {
+  display: block;
+  width: 100%;
+  margin-top: .5rem;
+  padding: .4rem .7rem;
+  border: 0;
+  border-inline-start: 3px solid var(--rst-muted);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--rst-muted) 8%, transparent);
+  color: inherit;
+  font: inherit;
+  font-size: .8125rem;
+  text-align: start;
+}
+.rst-check.is-ok { border-color: var(--rst-get); background: color-mix(in srgb, var(--rst-get) 9%, transparent); }
+.rst-check.is-error { border-color: var(--rst-delete); background: color-mix(in srgb, var(--rst-delete) 9%, transparent); cursor: pointer; }
+.rst-check.is-error:hover, .rst-check.is-error:focus { background: color-mix(in srgb, var(--rst-delete) 15%, transparent); }
+.rst-check:disabled { opacity: 1; }

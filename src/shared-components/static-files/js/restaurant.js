@@ -1,5 +1,5 @@
 /* RESTaurant - client side behaviour: service tree, list filters, copy buttons,
-   code fields and the request console. No external libraries are used. */
+   code editor and the request console. Nothing is loaded from outside of APEX. */
 (function () {
     "use strict";
 
@@ -124,7 +124,155 @@
         });
     }
 
-    /* ---------- code fields: line numbers, tab key indents ---------- */
+    /* ---------- code editor ----------
+       Large code fields become a Monaco editor. Monaco ships with APEX, it is the
+       editor of the App Builder, so nothing is downloaded from elsewhere. Should
+       it not be available, the field stays a text area with line numbers. */
+    var monacoReady,
+        SQL_KEYWORDS = ("select from where and or not null is in like between exists case when then else end as on join left right " +
+            "inner outer full cross natural using group by order having union all minus intersect except insert into values update " +
+            "set delete merge matched distinct unique fetch first next row rows only offset with recursive connect start prior level " +
+            "rownum nulls last asc desc over partition within for of nowait returning pivot unpivot lateral apply " +
+            "begin declare exception if elsif loop while exit continue return raise procedure function cursor open close type record " +
+            "table index subtype pragma commit rollback savepoint execute immediate bulk collect forall constant default out nocopy " +
+            "goto others true false is rowtype reverse authid deterministic new limit lock mode share exclusive grant revoke create " +
+            "alter drop truncate replace view sequence trigger package body synonym").split(" "),
+        SQL_FUNCTIONS = ("nvl nvl2 coalesce nullif decode to_char to_number to_date to_timestamp to_clob to_blob trunc round floor ceil " +
+            "abs mod power substr instr length upper lower initcap trim ltrim rtrim lpad rpad replace translate concat count sum min " +
+            "max avg median listagg row_number rank dense_rank lag lead first_value last_value json_object json_array json_arrayagg " +
+            "json_objectagg json_value json_query json_table json_serialize json_exists sys_context sys_guid regexp_like " +
+            "regexp_replace regexp_substr regexp_instr regexp_count cast extract greatest least add_months months_between last_day " +
+            "sysdate systimestamp current_date current_timestamp user sqlcode sqlerrm dual utl_raw dbms_lob dbms_output " +
+            "apex_json apex_util apex_string ords owa_util htp").split(" "),
+        SQL_TYPES = ("varchar2 varchar nvarchar2 char nchar number integer int pls_integer binary_integer simple_integer float " +
+            "binary_float binary_double date timestamp interval clob nclob blob bfile raw long rowid urowid boolean json xmltype " +
+            "sys_refcursor vector").split(" ");
+
+    function defineSql(monaco) {
+        ["sql", "plsql"].forEach(function (id) {
+            monaco.languages.register({ id: id });
+            monaco.languages.setLanguageConfiguration(id, {
+                comments: { lineComment: "--", blockComment: ["/*", "*/"] },
+                brackets: [["(", ")"], ["[", "]"]],
+                autoClosingPairs: [
+                    { open: "(", close: ")" },
+                    { open: "[", close: "]" },
+                    { open: "'", close: "'", notIn: ["string", "comment"] }
+                ],
+                surroundingPairs: [{ open: "(", close: ")" }, { open: "'", close: "'" }, { open: "\"", close: "\"" }]
+            });
+            monaco.languages.setMonarchTokensProvider(id, {
+                ignoreCase: true,
+                defaultToken: "",
+                keywords: SQL_KEYWORDS,
+                functions: SQL_FUNCTIONS,
+                types: SQL_TYPES,
+                tokenizer: {
+                    root: [
+                        [/--.*$/, "comment"],
+                        [/\/\*/, "comment", "@comment"],
+                        [/n?q'\[/, "string", "@quotedBracket"],
+                        [/n?q'\{/, "string", "@quotedBrace"],
+                        [/n?q'\(/, "string", "@quotedParen"],
+                        [/'/, "string", "@string"],
+                        [/"[^"]*"/, "identifier"],
+                        [/:[a-zA-Z][\w$#]*/, "variable.predefined"],
+                        [/\d+(\.\d+)?([eE][+-]?\d+)?/, "number"],
+                        [/[a-zA-Z][\w$#]*/, {
+                            cases: {
+                                "@keywords": "keyword",
+                                "@types": "type",
+                                "@functions": "predefined",
+                                "@default": "identifier"
+                            }
+                        }],
+                        [/[()\[\]]/, "@brackets"],
+                        [/[;,.]/, "delimiter"],
+                        [/[<>=!|+\-*\/%:@^]+/, "operator"]
+                    ],
+                    comment: [
+                        [/[^*\/]+/, "comment"],
+                        [/\*\//, "comment", "@pop"],
+                        [/[*\/]/, "comment"]
+                    ],
+                    string: [
+                        [/[^']+/, "string"],
+                        [/''/, "string.escape"],
+                        [/'/, "string", "@pop"]
+                    ],
+                    quotedBracket: [[/\]'/, "string", "@pop"], [/[^\]]+|\]/, "string"]],
+                    quotedBrace: [[/\}'/, "string", "@pop"], [/[^}]+|\}/, "string"]],
+                    quotedParen: [[/\)'/, "string", "@pop"], [/[^)]+|\)/, "string"]]
+                }
+            });
+        });
+    }
+
+    function loadMonaco() {
+        if (!monacoReady) {
+            monacoReady = new Promise(function (resolve, reject) {
+                var apexApi = window.apex || {},
+                    version = apexApi.libVersions && apexApi.libVersions.monacoEditor,
+                    root, link;
+                if (!version || !apexApi.env || !apexApi.env.APEX_FILES) {
+                    reject(new Error("Monaco is not available"));
+                    return;
+                }
+                root = apexApi.env.APEX_FILES + "libraries/monaco-editor/" + version + "/monaco-editor.min";
+                link = document.createElement("link");
+                link.rel = "stylesheet";
+                link.href = root + ".css";
+                document.head.appendChild(link);
+                import(root + ".js").then(function (module) {
+                    defineSql(module.monaco);
+                    resolve(module.monaco);
+                }, reject);
+            });
+        }
+        return monacoReady;
+    }
+
+    function isDark() {
+        var color = window.getComputedStyle(document.body).backgroundColor.match(/\d+/g) || [255, 255, 255];
+        return (0.299 * color[0] + 0.587 * color[1] + 0.114 * color[2]) < 128;
+    }
+
+    function codeLanguage(area) {
+        return area.getAttribute("data-rst-language") || "sql";
+    }
+
+    function createEditor(area, monaco) {
+        var host = document.createElement("div"),
+            label = document.querySelector("label[for='" + area.id + "']"),
+            editor;
+        host.className = "rst-monaco";
+        host.style.height = Math.max(area.offsetHeight, 260) + "px";
+        area.parentNode.insertBefore(host, area);
+        area.classList.add("rst-code-source");
+        editor = monaco.editor.create(host, {
+            value: area.value,
+            language: codeLanguage(area),
+            theme: isDark() ? "vs-dark" : "vs",
+            ariaLabel: label ? label.textContent : "Source",
+            automaticLayout: true,
+            fixedOverflowWidgets: true,
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            renderLineHighlight: "line",
+            fontSize: 13,
+            tabSize: 4,
+            insertSpaces: true
+        });
+        editor.onDidChangeModelContent(function () {
+            area.value = editor.getValue();
+            area.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        area.rstEditor = { monaco: monaco, editor: editor };
+        if (area.rstCheck) {
+            showCheck(area, area.rstCheck);
+        }
+    }
+
     function addLineNumbers(area) {
         var editor = document.createElement("div"),
             gutter = document.createElement("div"),
@@ -162,7 +310,11 @@
         area.setAttribute("autocapitalize", "off");
         area.setAttribute("autocomplete", "off");
         if (area.rows >= 8) {
-            addLineNumbers(area);
+            loadMonaco().then(function (monaco) {
+                createEditor(area, monaco);
+            }).catch(function () {
+                addLineNumbers(area);
+            });
         }
         area.addEventListener("keydown", function (event) {
             if (event.key !== "Tab" || event.ctrlKey || event.altKey || event.metaKey) {
@@ -184,6 +336,104 @@
             area.dispatchEvent(new Event("input", { bubbles: true }));
         });
     }
+
+    /* ---------- result of the compile check ---------- */
+    function checkElement(area) {
+        var group = area.closest(".apex-item-group") || area.parentNode,
+            element = group.querySelector(".rst-check");
+        if (!element) {
+            element = document.createElement("button");
+            element.type = "button";
+            element.className = "rst-check";
+            element.setAttribute("aria-live", "polite");
+            group.appendChild(element);
+            element.addEventListener("click", function () {
+                goToCheck(area);
+            });
+        }
+        return element;
+    }
+
+    // moves the cursor to the reported position
+    function goToCheck(area) {
+        var check = area.rstCheck, lines, offset, i;
+        if (!check || check.status !== "ERROR" || !check.line) {
+            return;
+        }
+        if (area.rstEditor) {
+            area.rstEditor.editor.revealLineInCenter(check.line);
+            area.rstEditor.editor.setPosition({ lineNumber: check.line, column: check.column || 1 });
+            area.rstEditor.editor.focus();
+            return;
+        }
+        lines = area.value.split("\n");
+        offset = 0;
+        for (i = 0; i < check.line - 1 && i < lines.length; i += 1) {
+            offset += lines[i].length + 1;
+        }
+        area.focus();
+        area.setSelectionRange(offset + (check.column || 1) - 1, offset + (lines[check.line - 1] || "").length);
+    }
+
+    function showCheck(area, check) {
+        var element = checkElement(area),
+            markers = [],
+            model, word;
+        area.rstCheck = check;
+        element.className = "rst-check is-" + check.status.toLowerCase();
+        element.disabled = check.status !== "ERROR";
+        if (check.status === "OK") {
+            element.textContent = "No errors found";
+        } else if (check.status === "ERROR") {
+            element.textContent = (check.line ? "Line " + check.line + ", column " + (check.column || 1) + ": " : "") + check.message;
+        } else if (check.status === "CHECKING") {
+            element.textContent = "Checking ...";
+        } else {
+            element.textContent = check.message || "";
+        }
+        element.style.display = element.textContent ? "" : "none";
+        if (area.rstEditor && check.status !== "CHECKING") {
+            model = area.rstEditor.editor.getModel();
+            if (check.status === "ERROR" && check.line) {
+                word = model.getWordAtPosition({ lineNumber: Math.min(check.line, model.getLineCount()), column: check.column || 1 });
+                markers.push({
+                    severity: area.rstEditor.monaco.MarkerSeverity.Error,
+                    message: check.message,
+                    startLineNumber: check.line,
+                    startColumn: word ? word.startColumn : (check.column || 1),
+                    endLineNumber: check.line,
+                    endColumn: word ? word.endColumn : model.getLineMaxColumn(Math.min(check.line, model.getLineCount()))
+                });
+            }
+            area.rstEditor.monaco.editor.setModelMarkers(model, "restaurant", markers);
+        }
+    }
+
+    // used by the pages
+    window.restaurant = {
+        // language of a code field: sql, plsql, javascript or json
+        setLanguage: function (itemId, language) {
+            var area = document.getElementById(itemId);
+            if (area) {
+                area.setAttribute("data-rst-language", language);
+                if (area.rstEditor) {
+                    area.rstEditor.monaco.editor.setModelLanguage(area.rstEditor.editor.getModel(), language);
+                }
+            }
+        },
+        // shows the result of a compile check below the field and in the editor
+        showCheck: function (itemId, status, line, column, message) {
+            var area = document.getElementById(itemId);
+            if (area) {
+                showCheck(area, {
+                    status: status || "EMPTY",
+                    line: parseInt(line, 10) || null,
+                    column: parseInt(column, 10) || null,
+                    message: message || ""
+                });
+            }
+        }
+    };
 
     /* ---------- request console ---------- */
     function initConsole(box) {

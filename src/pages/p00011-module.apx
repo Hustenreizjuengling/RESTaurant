@@ -457,6 +457,38 @@ page 11 (
         }
     )
 
+    button check (
+        buttonName: CHECK
+        label: Check Handlers
+        layout {
+            sequence: 35
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-check-circle-o
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 10
+                items: {
+                    P10_CHECK: Y
+                    P10_ID: &P11_ID.
+                }
+            }
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P11_ID
+        }
+    )
+
     button export-json (
         buttonName: EXPORT_JSON
         label: Export

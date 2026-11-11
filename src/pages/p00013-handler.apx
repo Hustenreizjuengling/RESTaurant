@@ -34,10 +34,29 @@ page 13 (
                     apex.item("P13_ITEMS_PER_PAGE")[get ? "show" : "hide"]();
                     apex.item("P13_MIMES_ALLOWED")[method.getValue() === "POST" || method.getValue() === "PUT" ? "show" : "hide"]();
                     apex.item("P13_MLE_ENV_NAME")[type.getValue() === "mle/javascript" ? "show" : "hide"]();
+                    restaurant.setLanguage("P13_SOURCE",
+                        type.getValue() === "mle/javascript" ? "javascript" : type.getValue() === "plsql/block" ? "plsql" : "sql");
                 }
 
-                apex.jQuery("#P13_METHOD, #P13_SOURCE_TYPE").on("change", sync);
+                // the source is checked when the page opens, when the type changes
+                // and shortly after the last key stroke
+                var timer;
+
+                function check() {
+                    window.clearTimeout(timer);
+                    apex.jQuery("#P13_SOURCE").trigger("rstcheck");
+                }
+
+                apex.jQuery("#P13_METHOD, #P13_SOURCE_TYPE").on("change", function () {
+                    sync();
+                    check();
+                });
+                apex.jQuery("#P13_SOURCE").on("input", function () {
+                    window.clearTimeout(timer);
+                    timer = window.setTimeout(check, 900);
+                });
                 sync();
+                apex.jQuery(apex.gPageContext$).on("apexreadyend", check);
             })();
             ```
     }
@@ -517,7 +536,55 @@ page 13 (
             dataType: clob
         }
         help {
-            helpText: The query or code of the handler. Reference parameters as bind variables, for example <strong>:id</strong>.
+            helpText: The query or code of the handler. Reference parameters as bind variables, for example <strong>:id</strong>. The database checks the source while you type, without running it, and reports the first error with its line and column.
+        }
+    )
+
+    pageItem P13_CHECK_STATUS (
+        type: hidden
+        settings {
+            valueProtected: false
+        }
+        layout {
+            sequence: 20
+            region: @source
+            slot: regionBody
+        }
+    )
+
+    pageItem P13_CHECK_LINE (
+        type: hidden
+        settings {
+            valueProtected: false
+        }
+        layout {
+            sequence: 30
+            region: @source
+            slot: regionBody
+        }
+    )
+
+    pageItem P13_CHECK_COLUMN (
+        type: hidden
+        settings {
+            valueProtected: false
+        }
+        layout {
+            sequence: 40
+            region: @source
+            slot: regionBody
+        }
+    )
+
+    pageItem P13_CHECK_MESSAGE (
+        type: hidden
+        settings {
+            valueProtected: false
+        }
+        layout {
+            sequence: 50
+            region: @source
+            slot: regionBody
         }
     )
 
@@ -629,6 +696,27 @@ page 13 (
         }
     )
 
+    button check (
+        buttonName: CHECK
+        label: Check Source
+        layout {
+            sequence: 10
+            region: @source
+            slot: edit
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-check-circle-o
+        }
+        behavior {
+            action: definedByDynamicAction
+        }
+    )
+
     button add-parameter (
         buttonName: ADD_PARAMETER
         label: Add Parameter
@@ -655,6 +743,95 @@ page 13 (
                 clearCache: 14
             }
         }
+    )
+
+    dynamicAction check-clicked (
+        name: Check Clicked
+        execution {
+            sequence: 20
+        }
+        when {
+            event: click
+            selectionType: button
+            button: @check
+        }
+
+        action request-check (
+            action: executeJsCode
+            settings {
+                jsCode: apex.jQuery("#P13_SOURCE").trigger("rstcheck");
+            }
+            execution {
+                sequence: 10
+                fireOnInit: false
+            }
+        )
+
+    )
+
+    dynamicAction check-source (
+        name: Check Source
+        execution {
+            sequence: 30
+        }
+        when {
+            event: custom
+            customEvent: rstcheck
+            selectionType: items
+            items: P13_SOURCE
+        }
+
+        action show-checking (
+            action: executeJsCode
+            settings {
+                jsCode: restaurant.showCheck("P13_SOURCE", "CHECKING");
+            }
+            execution {
+                sequence: 10
+                fireOnInit: false
+            }
+        )
+
+        action compile (
+            action: executeServerSideCode
+            settings {
+                plsqlCode:
+                    ```plsql
+                    -- runs the engine, see the plug-in "RESTaurant Engine"
+                    declare
+                        l_engine  blob;
+                        l_message varchar2(32767);
+                    begin
+                        select file_content
+                          into l_engine
+                          from apex_application_static_files
+                         where application_id = :APP_ID
+                           and file_name = 'engine/restaurant-engine.sql';
+                        execute immediate apex_util.blob_to_clob(l_engine, 'AL32UTF8')
+                            using in 'HANDLER_CHECK', in 'P13_', out l_message;
+                    end;
+                    ```
+                itemsToSubmit: P13_SOURCE,P13_SOURCE_TYPE
+                itemsToReturn: P13_CHECK_STATUS,P13_CHECK_LINE,P13_CHECK_COLUMN,P13_CHECK_MESSAGE
+                suppressChangeEvent: true
+            }
+            execution {
+                sequence: 20
+                fireOnInit: false
+            }
+        )
+
+        action show-result (
+            action: executeJsCode
+            settings {
+                jsCode: restaurant.showCheck("P13_SOURCE", $v("P13_CHECK_STATUS"), $v("P13_CHECK_LINE"), $v("P13_CHECK_COLUMN"), $v("P13_CHECK_MESSAGE"));
+            }
+            execution {
+                sequence: 30
+                fireOnInit: false
+            }
+        )
+
     )
 
     dynamicAction parameter-dialog-closed (

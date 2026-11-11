@@ -36,6 +36,8 @@ page 90 (
                     <dt>Role</dt><dd>Granted to OAuth clients and users, assigned to privileges.</dd>
                     <dt>OAuth client</dt><dd>An application that calls protected services with an access token.</dd>
                 </dl>
+                <h3>Editor and compile check</h3>
+                <p>The source editor is the Monaco editor that ships with APEX. The database checks the source of a handler while you type, without running it, and the first error is marked with its line and column. <em>Check Handlers</em> on the module pages checks all handlers at once.</p>
                 <h3>Export and import</h3>
                 <p>Modules, single templates and single handlers can be exported as JSON, as a SQL script or as a ZIP archive, and imported again in this or another schema. The JSON format is documented in the project repository, together with a JSON schema.</p>
                 <p><a href="https://github.com/Hustenreizjuengling/RESTaurant" target="_blank" rel="noopener">github.com/Hustenreizjuengling/RESTaurant</a></p>

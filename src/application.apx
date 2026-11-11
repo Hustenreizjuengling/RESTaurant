@@ -1,6 +1,6 @@
 app RESTAURANT (
     name: RESTaurant
-    version: 1.0.0
+    version: 1.1.0
     logo {
         type: imageAndText
         imageUrl: #APP_FILES#icons/app-icon-192.png
@@ -63,7 +63,7 @@ app RESTAURANT (
 
     substitution APP_VERSION (
         value {
-            staticValue: 1.0.0
+            staticValue: 1.1.0
         }
     )
 

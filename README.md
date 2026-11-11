@@ -36,7 +36,10 @@ handler.
 - Modules, templates, handlers and parameters, with a tree to move between them
 - Rename a module or a template and keep everything below it
 - Publish and unpublish modules, allowed origins, pagination size, protecting privilege
-- Source editor with line numbers and a list of the bind variables ORDS provides
+- Source editor with syntax highlighting for SQL, PL/SQL and JavaScript and a list of the bind variables ORDS provides
+- Compile check while you type: the database parses the source without running it and the first error is marked
+  with its line and column. *Check Handlers* does the same for a module or the whole schema, for example after an
+  import.
 - *Try it*: send a request to the saved handler from the page and read status, headers and body, or copy it as cURL
 - Search the source of all handlers
 - Duplicate a module under a new name and base path
@@ -66,7 +69,8 @@ handler.
 | | |
 |---|---|
 | ![Dashboard](docs/screenshots/dashboard.png) | ![Module with its templates](docs/screenshots/module.png) |
-| ![Request console](docs/screenshots/console.png) | ![Export with preview](docs/screenshots/export.png) |
+| ![Compile check with a marked error](docs/screenshots/check.png) | ![Request console](docs/screenshots/console.png) |
+| ![Export with preview](docs/screenshots/export.png) | ![Privileges](docs/screenshots/privileges.png) |
 | ![Review of an import](docs/screenshots/import.png) | ![OAuth client](docs/screenshots/oauth-client.png) |
 
 ## Requirements
@@ -217,6 +221,29 @@ into the schema.
 ORDS replaces the children of an element when the element is defined again. The engine therefore reads the element
 with everything below it, changes it and writes it back, in one transaction. That is how a module can be renamed or
 a single parameter removed although the API has no call for it.
+
+## The editor and the compile check
+
+Both use only what is already there.
+
+**Syntax highlighting** comes from the Monaco editor that ships with APEX, the editor of the App Builder. The
+application loads it from the APEX files of your instance; nothing is downloaded from elsewhere and the application
+contains no copy of it. APEX has no item type for it, so the application looks up the version through
+`apex.libVersions` and starts the editor itself. Should that ever stop working, for example after an upgrade that
+moves the files, the source field falls back to a plain text area with line numbers. Everything else keeps working.
+
+**The compile check** is done by the database. The source is passed to `DBMS_SQL.PARSE`, which finds syntax errors and
+unknown tables, columns and program units, and it is never executed: a query is parsed as an inline view and PL/SQL as
+a nested block, so a statement of another kind, such as DDL, is a syntax error.
+
+- The check runs when a handler is opened, shortly after you stop typing, and on *Check Source*. It works on what is
+  in the editor, saved or not. A handler that does not compile can still be saved.
+- The database reports the first error. Click the message to jump to it.
+- The database only checks the syntax of PL/SQL that contains bind variables. For the full check the application
+  replaces every bind variable by a local variable. Its type comes from the parameters of the handler; `:body` is a
+  BLOB, `:body_text` a CLOB, everything else a string. A cursor opened for a bind variable therefore needs its
+  parameter of the type RESULTSET first.
+- JavaScript handlers are highlighted but not checked.
 
 ## Development
 

@@ -14,14 +14,17 @@
 --   :message  success message of the operation (out)
 --------------------------------------------------------------------------------
 declare
-    c_app_version    constant varchar2(20) := '1.0.0';
+    c_app_version    constant varchar2(20) := '1.1.0';
     c_format         constant varchar2(30) := 'restaurant-ords';
     c_format_version constant pls_integer  := 1;
     c_doc            constant varchar2(30) := 'RESTAURANT_DOC';
     c_plan           constant varchar2(30) := 'RESTAURANT_PLAN';
+    c_check          constant varchar2(30) := 'RESTAURANT_CHECK';
     c_lf             constant varchar2(1)  := chr(10);
     c_cr             constant varchar2(1)  := chr(13);
     c_max_line       constant pls_integer  := 4000;
+    -- a bind variable and the character in front of it
+    c_bind           constant varchar2(60) := '(^|[^A-Za-z0-9_"''])(:[A-Za-z][A-Za-z0-9_$#]*)';
 
     e_user exception;
     pragma exception_init(e_user, -20999);
@@ -1821,6 +1824,256 @@ declare
     end import_apply;
 
     --------------------------------------------------------------------------------
+    -- compile check
+    --
+    -- The source of a handler is parsed by the database, which finds syntax errors
+    -- and unknown tables, columns or program units. Nothing is executed: a query
+    -- is parsed as an inline view and PL/SQL as a nested block, so a statement of
+    -- another kind, for example DDL, is a syntax error and can never run.
+    --
+    -- PL/SQL with bind variables is only checked for its syntax by the database.
+    -- To get the full check, every bind variable :name is replaced by a local
+    -- variable ":name" of a fitting type for the duration of the check.
+    --------------------------------------------------------------------------------
+    procedure line_of (p_source in clob, p_position in pls_integer, p_line out number, p_column out number) is
+        l_length pls_integer := dbms_lob.getlength(p_source);
+        l_target pls_integer := greatest(least(p_position, l_length), 1);
+        l_start  pls_integer := 1;
+        l_next   pls_integer;
+    begin
+        p_line := 1;
+        loop
+            l_next := dbms_lob.instr(p_source, c_lf, l_start);
+            exit when l_next = 0 or l_next >= l_target;
+            p_line  := p_line + 1;
+            l_start := l_next + 1;
+        end loop;
+        p_column := l_target - l_start + 1;
+    end line_of;
+
+    function line_text (p_source in clob, p_line in number) return varchar2 is
+        l_start pls_integer := 1;
+        l_next  pls_integer;
+    begin
+        for i in 2 .. p_line loop
+            l_next := dbms_lob.instr(p_source, c_lf, l_start);
+            exit when l_next = 0;
+            l_start := l_next + 1;
+        end loop;
+        l_next := dbms_lob.instr(p_source, c_lf, l_start);
+        return dbms_lob.substr(p_source, least(case when l_next = 0 then 4000 else l_next - l_start end, 4000), l_start);
+    end line_text;
+
+    -- the declarations of the local variables that stand in for the bind variables
+    function bind_declarations (p_source in clob, p_handler_id in number) return varchar2 is
+        type t_types is table of varchar2(60) index by varchar2(200);
+        l_types  t_types;
+        l_done   t_name_set;
+        l_result varchar2(32767);
+        l_name   varchar2(200);
+        l_key    varchar2(200);
+        l_n      pls_integer := 1;
+    begin
+        -- parameters ORDS provides on its own
+        l_types('BODY')      := 'blob';
+        l_types('BODY_TEXT') := 'clob';
+        l_types('BODY_JSON') := 'clob';
+        for i in 1 .. 7 loop
+            l_types(case i
+                        when 1 then 'STATUS_CODE'
+                        when 2 then 'FETCH_OFFSET'
+                        when 3 then 'FETCH_SIZE'
+                        when 4 then 'ROW_OFFSET'
+                        when 5 then 'ROW_COUNT'
+                        when 6 then 'PAGE_OFFSET'
+                        else 'PAGE_SIZE'
+                    end) := 'number';
+        end loop;
+        -- parameters of the handler
+        for p in ( select upper(bind_variable_name) bind_name, param_type
+                     from user_ords_parameters
+                    where handler_id = p_handler_id
+                      and bind_variable_name is not null )
+        loop
+            l_types(p.bind_name) := case
+                                        when p.param_type = 'RESULTSET'                then 'sys_refcursor'
+                                        when p.param_type in ('INT', 'LONG', 'DOUBLE') then 'number'
+                                        when p.param_type = 'BOOLEAN'                  then 'boolean'
+                                        when p.param_type = 'TIMESTAMP'                then 'timestamp with time zone'
+                                        else 'varchar2(32767)'
+                                    end;
+        end loop;
+        loop
+            l_name := regexp_substr(p_source, c_bind, 1, l_n, null, 2);
+            exit when l_name is null or l_n > 2000;
+            if not l_done.exists(l_name) then
+                l_done(l_name) := true;
+                l_key    := upper(substr(l_name, 2));
+                l_result := l_result || '"' || l_name || '" '
+                         || case when l_types.exists(l_key) then l_types(l_key) else 'varchar2(32767)' end || '; ';
+            end if;
+            l_n := l_n + 1;
+        end loop;
+        return l_result;
+    end bind_declarations;
+
+    -- translates a column of the checked text back to the column of the source:
+    -- every replaced bind variable in front of it made the line two characters longer
+    function source_column (p_line_text in varchar2, p_column in number) return number is
+        l_n      pls_integer := 1;
+        l_start  pls_integer;
+        l_length pls_integer;
+        l_shift  pls_integer := 0;
+    begin
+        loop
+            l_start := regexp_instr(p_line_text, c_bind, 1, l_n, 0, null, 2);
+            exit when nvl(l_start, 0) = 0;
+            l_length := length(regexp_substr(p_line_text, c_bind, 1, l_n, null, 2));
+            exit when l_start + l_shift >= p_column;
+            if p_column < l_start + l_shift + l_length + 2 then
+                return l_start; -- the error is at the bind variable itself
+            end if;
+            l_shift := l_shift + 2;
+            l_n     := l_n + 1;
+        end loop;
+        return greatest(p_column - l_shift, 1);
+    end source_column;
+
+    -- p_status: OK, ERROR, SKIPPED (not checked) or EMPTY
+    procedure check_source (
+        p_source      in  clob,
+        p_source_type in  varchar2,
+        p_handler_id  in  number,
+        p_status      out varchar2,
+        p_line        out number,
+        p_column      out number,
+        p_message     out varchar2 )
+    is
+        l_length    pls_integer := nvl(dbms_lob.getlength(p_source), 0);
+        l_plsql     boolean     := p_source_type = 'plsql/block';
+        l_prefix    varchar2(32767);
+        l_statement clob;
+        l_tail      varchar2(800);
+        l_cursor    integer;
+        l_error     varchar2(32767);
+        l_offset    pls_integer;
+        l_lines     number;
+        l_ignore    number;
+    begin
+        if l_length = 0 or ( l_length <= 4000 and regexp_like(dbms_lob.substr(p_source, 4000, 1), '^\s*$') ) then
+            p_status := 'EMPTY';
+            return;
+        elsif p_source_type = 'mle/javascript' then
+            p_status  := 'SKIPPED';
+            p_message := 'JavaScript handlers are not checked.';
+            return;
+        end if;
+        line_of(p_source, l_length, l_lines, l_ignore);
+        if l_plsql then
+            l_prefix    := 'declare ' || bind_declarations(p_source, p_handler_id) || 'begin ';
+            l_statement := l_prefix || regexp_replace(p_source, c_bind, '\1"\2"') || c_lf || 'end;';
+        else
+            l_tail := dbms_lob.substr(p_source, 200, greatest(l_length - 199, 1));
+            if regexp_like(l_tail, ';\s*$') then
+                p_status  := 'ERROR';
+                p_message := 'A query must not end with a semicolon.';
+                line_of(p_source, greatest(l_length - 199, 1) + length(regexp_replace(l_tail, '\s+$')) - 1, p_line, p_column);
+                return;
+            end if;
+            l_prefix    := 'select 1 from (';
+            l_statement := l_prefix || p_source || c_lf || ')';
+        end if;
+        l_cursor := dbms_sql.open_cursor;
+        begin
+            dbms_sql.parse(l_cursor, l_statement, dbms_sql.native);
+            p_status := 'OK';
+        exception
+            when others then
+                l_error  := sqlerrm;
+                l_offset := dbms_sql.last_error_position;
+                p_status := 'ERROR';
+                if l_plsql and l_error like 'ORA-06550%' then
+                    -- ORA-06550: line 3, column 9: followed by the actual message
+                    p_line    := to_number(regexp_substr(l_error, 'line (\d+), column (\d+)', 1, 1, null, 1));
+                    p_column  := to_number(regexp_substr(l_error, 'line (\d+), column (\d+)', 1, 1, null, 2));
+                    p_message := regexp_substr(l_error, ':' || c_lf || '(.*?)(' || c_lf || 'ORA-06550|$)', 1, 1, 'n', 1);
+                    p_message := substr(trim(regexp_replace(regexp_replace(p_message, '\s+', ' '), '^PL/SQL: ')), 1, 500);
+                    if p_message like 'PLS-00456%' then
+                        p_message := p_message || '. Add a parameter of the data type RESULTSET for this bind variable.';
+                    end if;
+                    if p_line = 1 then
+                        p_column := p_column - length(l_prefix);
+                    end if;
+                    if p_line <= l_lines then
+                        p_column := source_column(line_text(p_source, p_line), p_column);
+                    end if;
+                elsif l_plsql then
+                    p_message := regexp_substr(l_error, '^[^' || c_lf || ']*');
+                else
+                    line_of(p_source, l_offset - length(l_prefix) + 1, p_line, p_column);
+                    p_message := regexp_substr(l_error, '^[^' || c_lf || ']*');
+                end if;
+                if nvl(p_line, l_lines + 1) > l_lines then
+                    -- the error is at the end of the source
+                    line_of(p_source, l_length, p_line, p_column);
+                end if;
+                p_column  := greatest(nvl(p_column, 1), 1);
+                p_message := nvl(p_message, regexp_substr(l_error, '^[^' || c_lf || ']*'));
+        end;
+        if dbms_sql.is_open(l_cursor) then
+            dbms_sql.close_cursor(l_cursor);
+        end if;
+    end check_source;
+
+    -- HANDLER_CHECK: checks SOURCE of the type SOURCE_TYPE as it is entered on the
+    -- page, saved or not, and returns CHECK_STATUS, CHECK_LINE, CHECK_COLUMN and
+    -- CHECK_MESSAGE. ID is the handler, its parameters give the bind variables
+    -- their types.
+    procedure handler_check is
+        l_status  varchar2(30);
+        l_line    number;
+        l_column  number;
+        l_message varchar2(32767);
+    begin
+        check_source(item_clob('SOURCE'), item('SOURCE_TYPE'), to_number(item('ID')), l_status, l_line, l_column, l_message);
+        set_item('CHECK_STATUS', l_status);
+        set_item('CHECK_LINE', l_line);
+        set_item('CHECK_COLUMN', l_column);
+        set_item('CHECK_MESSAGE', substr(l_message, 1, 4000));
+    end handler_check;
+
+    -- HANDLERS_CHECK: checks the saved handlers of the module ID, or of all modules
+    -- when ID is empty, and stores one row per handler in a collection
+    procedure handlers_check is
+        l_module_id number := to_number(item('ID'));
+        l_status    varchar2(30);
+        l_line      number;
+        l_column    number;
+        l_message   varchar2(32767);
+    begin
+        apex_collection.create_or_truncate_collection(c_check);
+        for h in ( select h.id, h.method, h.source_type, h.source, t.uri_template, m.name, m.uri_prefix
+                     from user_ords_handlers h
+                     join user_ords_templates t on t.id = h.template_id
+                     join user_ords_modules m on m.id = t.module_id
+                    where l_module_id is null or m.id = l_module_id
+                    order by m.name, t.uri_template, h.method )
+        loop
+            check_source(h.source, h.source_type, h.id, l_status, l_line, l_column, l_message);
+            apex_collection.add_member(
+                p_collection_name => c_check,
+                p_c001            => l_status,
+                p_c002            => h.method,
+                p_c003            => h.uri_prefix || h.uri_template,
+                p_c004            => h.name,
+                p_c005            => substr(l_message, 1, 4000),
+                p_n001            => h.id,
+                p_n002            => l_line,
+                p_n003            => l_column );
+        end loop;
+    end handlers_check;
+
+    --------------------------------------------------------------------------------
     -- editing
     --------------------------------------------------------------------------------
     procedure module_save is
@@ -2123,6 +2376,8 @@ declare
             when 'EXPORT_PREVIEW'   then export_preview;
             when 'IMPORT_LOAD'      then import_load;
             when 'IMPORT_APPLY'     then import_apply;
+            when 'HANDLER_CHECK'    then handler_check;
+            when 'HANDLERS_CHECK'   then handlers_check;
             else fail('Unknown engine action "' || l_action || '".');
         end case;
     exception

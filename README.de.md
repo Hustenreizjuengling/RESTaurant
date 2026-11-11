@@ -30,7 +30,10 @@ Template oder einen einzelnen Handler.
 - Module, Templates, Handler und Parameter, mit einem Baum zur Navigation
 - Module und Templates umbenennen, ohne dass der Inhalt darunter verloren geht
 - Module veröffentlichen und zurückziehen, erlaubte Origins, Seitengröße, schützendes Privileg
-- Quelltext-Editor mit Zeilennummern und einer Liste der Bind-Variablen, die ORDS bereitstellt
+- Quelltext-Editor mit Syntax-Highlighting für SQL, PL/SQL und JavaScript und einer Liste der Bind-Variablen, die ORDS
+  bereitstellt
+- Compile-Prüfung beim Tippen: Die Datenbank parst den Quelltext, ohne ihn auszuführen; der erste Fehler wird mit
+  Zeile und Spalte markiert. *Check Handlers* prüft ein Modul oder das ganze Schema, zum Beispiel nach einem Import.
 - *Try it*: einen Request direkt aus der Seite an den gespeicherten Handler senden und Status, Header und Body lesen,
   oder den Request als cURL-Befehl kopieren
 - Suche im Quelltext aller Handler
@@ -173,6 +176,31 @@ Schema wird nichts kompiliert.
 ORDS ersetzt die Kinder eines Elements, wenn das Element neu definiert wird. Die Engine liest ein Element deshalb mit
 allem, was darunter liegt, ändert es und schreibt es in einer Transaktion zurück. So lässt sich ein Modul umbenennen
 oder ein einzelner Parameter entfernen, obwohl die API dafür keinen Aufruf hat.
+
+## Der Editor und die Compile-Prüfung
+
+Beides nutzt nur, was ohnehin vorhanden ist.
+
+**Syntax-Highlighting** liefert der Monaco-Editor, der mit APEX ausgeliefert wird, also der Editor des App Builders.
+Die Anwendung lädt ihn aus den APEX-Dateien der eigenen Instanz; es wird nichts von außen nachgeladen und die Anwendung
+enthält keine Kopie davon. APEX hat dafür keinen Item-Typ, deshalb ermittelt die Anwendung die Version über
+`apex.libVersions` und startet den Editor selbst. Sollte das einmal nicht mehr funktionieren, etwa nach einem Upgrade,
+das die Dateien verschiebt, fällt das Quelltext-Feld auf ein einfaches Textfeld mit Zeilennummern zurück. Alles andere
+funktioniert weiter.
+
+**Die Compile-Prüfung** übernimmt die Datenbank. Der Quelltext wird an `DBMS_SQL.PARSE` übergeben; das findet
+Syntaxfehler sowie unbekannte Tabellen, Spalten und Programmeinheiten. Ausgeführt wird er dabei nie: Eine Abfrage wird
+als Inline-View geparst und PL/SQL als verschachtelter Block, sodass eine Anweisung anderer Art, etwa DDL, ein
+Syntaxfehler ist.
+
+- Geprüft wird beim Öffnen eines Handlers, kurz nach dem letzten Tastendruck und über *Check Source*, und zwar das,
+  was im Editor steht, gespeichert oder nicht. Ein Handler, der nicht kompiliert, lässt sich trotzdem speichern.
+- Die Datenbank meldet den ersten Fehler. Ein Klick auf die Meldung springt zur Stelle.
+- Bei PL/SQL mit Bind-Variablen prüft die Datenbank nur die Syntax. Für die vollständige Prüfung ersetzt die Anwendung
+  jede Bind-Variable durch eine lokale Variable. Deren Typ ergibt sich aus den Parametern des Handlers; `:body` ist ein
+  BLOB, `:body_text` ein CLOB, alles andere eine Zeichenkette. Ein Cursor, der für eine Bind-Variable geöffnet wird,
+  braucht deshalb zuerst seinen Parameter vom Typ RESULTSET.
+- JavaScript-Handler werden hervorgehoben, aber nicht geprüft.
 
 ## Entwicklung
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0
+
+- Source editor with syntax highlighting for SQL, PL/SQL and JavaScript, using the Monaco editor that ships with APEX
+- Compile check: the database parses the source of a handler while you type, without running it, and the first
+  error is marked with its line and column
+- *Check Handlers* runs the compile check for a module or for all modules, for example after an import
+- JSON editor for pasted exports on the import page
+
 ## 1.0.0
 
 First release.
