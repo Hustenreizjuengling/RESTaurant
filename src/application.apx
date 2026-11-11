@@ -18,7 +18,7 @@ app RESTAURANT (
         listTemplate: @/side-navigation-menu
         templateOptions: [
             #DEFAULT#
-            js-navCollapsed--icons
+            js-navCollapsed--default
             t-TreeNav--styleA
         ]
         list: @navigation-menu

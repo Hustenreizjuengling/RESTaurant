@@ -311,6 +311,9 @@ page 60 (
             ]
             icon: fa-download
         }
+        behavior {
+            warnOnUnsavedChanges: doNotCheck
+        }
     )
 
     button preview (
@@ -328,6 +331,9 @@ page 60 (
                 t-Button--iconLeft
             ]
             icon: fa-refresh
+        }
+        behavior {
+            warnOnUnsavedChanges: doNotCheck
         }
     )
 

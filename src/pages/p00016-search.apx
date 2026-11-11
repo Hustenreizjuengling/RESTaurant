@@ -1,0 +1,209 @@
+page 16 (
+    name: Search Source
+    alias: SEARCH
+    title: Search Source
+    pageGroup: @services
+    appearance {
+        pageTemplate: @/standard
+        templateOptions: #DEFAULT#
+    }
+    navigation {
+        warnOnUnsavedChanges: false
+    }
+    help {
+        helpText: Finds handlers by their source code, for example every handler that uses a certain table or package. The search ignores upper and lower case.
+    }
+
+    region heading (
+        name: Heading
+        title: Search Source
+        type: staticContent
+        source {
+            htmlCode: Find the handlers whose source contains a text, across all modules.
+        }
+        layout {
+            sequence: 10
+            slot: breadcrumbBar
+        }
+        appearance {
+            template: @/hero
+            templateOptions: #DEFAULT#
+            icon: fa-search
+        }
+    )
+
+    region search (
+        name: Search
+        type: staticContent
+        layout {
+            sequence: 20
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: [
+                #DEFAULT#
+                t-Region--hideHeader js-addHiddenHeadingRoleDesc
+            ]
+        }
+    )
+
+    region results (
+        name: Results
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    c_max_handlers constant pls_integer := 100;
+                    c_max_lines    constant pls_integer := 5;
+                    l_html     clob;
+                    l_buffer   varchar2(32767);
+                    l_term     varchar2(4000) := lower(:P16_SEARCH);
+                    l_handlers pls_integer := 0;
+                    l_lines    pls_integer;
+                    l_len      pls_integer;
+                    l_no       pls_integer;
+                    l_start    pls_integer;
+                    l_end      pls_integer;
+                    l_line     varchar2(4000);
+
+                    procedure p (p_text in varchar2) is
+                    begin
+                        if nvl(lengthb(l_buffer), 0) + nvl(lengthb(p_text), 0) > 32000 then
+                            dbms_lob.writeappend(l_html, length(l_buffer), l_buffer);
+                            l_buffer := null;
+                        end if;
+                        l_buffer := l_buffer || p_text;
+                    end p;
+                begin
+                    dbms_lob.createtemporary(l_html, true);
+                    p('<table class="rst-table"><thead><tr><th>Handler</th><th>Module</th><th>Matching lines</th></tr></thead><tbody>');
+                    for h in ( select h.id, h.method, h.source, t.uri_template, m.name, m.uri_prefix
+                                 from user_ords_handlers h
+                                 join user_ords_templates t on t.id = h.template_id
+                                 join user_ords_modules m on m.id = t.module_id
+                                where dbms_lob.instr(lower(h.source), l_term) > 0
+                                order by m.name, t.uri_template, h.method )
+                    loop
+                        l_handlers := l_handlers + 1;
+                        exit when l_handlers > c_max_handlers;
+                        p('<tr><td><a class="rst-method rst-method--' || lower(apex_escape.html_attribute(h.method)) || '" href="'
+                          || apex_page.get_url(p_page => 13, p_items => 'P13_ID', p_values => h.id) || '">' || apex_escape.html(h.method) || '</a> '
+                          || '<a class="rst-path" href="' || apex_page.get_url(p_page => 13, p_items => 'P13_ID', p_values => h.id) || '">'
+                          || apex_escape.html(h.uri_prefix || h.uri_template) || '</a></td><td>' || apex_escape.html(h.name) || '</td><td>');
+                        -- show the lines that contain the text, with their line numbers
+                        l_len   := dbms_lob.getlength(h.source);
+                        l_start := 1;
+                        l_no    := 0;
+                        l_lines := 0;
+                        while l_start <= l_len loop
+                            l_end := dbms_lob.instr(h.source, chr(10), l_start);
+                            if l_end = 0 then
+                                l_end := l_len + 1;
+                            end if;
+                            l_no   := l_no + 1;
+                            l_line := dbms_lob.substr(h.source, least(l_end - l_start, 1000), l_start);
+                            if instr(lower(l_line), l_term) > 0 then
+                                if l_lines = c_max_lines then
+                                    p('<div class="rst-muted">more matches in this handler</div>');
+                                    exit;
+                                end if;
+                                l_lines := l_lines + 1;
+                                p('<div class="rst-hit"><span class="rst-hit-line">' || l_no || '</span><span class="rst-mono">'
+                                  || apex_escape.html(substr(rtrim(l_line, chr(13)), 1, 300)) || '</span></div>');
+                            end if;
+                            l_start := l_end + 1;
+                        end loop;
+                        p('</td></tr>');
+                    end loop;
+                    p('</tbody></table>');
+                    if l_handlers = 0 then
+                        p('<div class="rst-empty"><p class="rst-muted">No handler contains this text.</p></div>');
+                    elsif l_handlers > c_max_handlers then
+                        p('<p class="rst-muted" style="padding:.75rem 1rem">Only the first ' || c_max_handlers || ' handlers are shown. Refine the search text.</p>');
+                    end if;
+                    if l_buffer is not null then
+                        dbms_lob.writeappend(l_html, length(l_buffer), l_buffer);
+                    end if;
+                    return l_html;
+                end;
+                ```
+        }
+        layout {
+            sequence: 30
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: [
+                #DEFAULT#
+                t-Region--noPadding
+                t-Region--hideHeader js-addHiddenHeadingRoleDesc
+                t-Region--scrollBody
+            ]
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P16_SEARCH
+        }
+    )
+
+    pageItem P16_SEARCH (
+        type: textField
+        label {
+            label: Text to find
+        }
+        settings {
+            subtype: search
+            submitWhenEnterPressed: true
+        }
+        layout {
+            sequence: 10
+            region: @search
+            slot: regionBody
+            columnSpan: 8
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+            icon: fa-search
+            valuePlaceholder: Table, package, column or any other text
+        }
+        validation {
+            maxLength: 200
+        }
+    )
+
+    button search (
+        buttonName: SEARCH
+        label: Search
+        layout {
+            sequence: 20
+            region: @search
+            slot: regionBody
+            startNewRow: false
+        }
+        appearance {
+            buttonTemplate: @/text
+            hot: true
+            templateOptions: #DEFAULT#
+        }
+        behavior {
+            warnOnUnsavedChanges: doNotCheck
+        }
+    )
+
+    branch show-results (
+        name: Show Results
+        execution {
+            sequence: 10
+        }
+        behavior {
+            target: {
+                page: 16
+            }
+        }
+    )
+
+)

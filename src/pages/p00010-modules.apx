@@ -150,6 +150,31 @@ page 10 (
         }
     )
 
+    button search (
+        buttonName: SEARCH
+        label: Search Source
+        layout {
+            sequence: 15
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-search
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 16
+                clearCache: 16
+            }
+        }
+    )
+
     button export (
         buttonName: EXPORT
         label: Export

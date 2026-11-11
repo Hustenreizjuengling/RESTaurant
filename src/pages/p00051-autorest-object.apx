@@ -235,6 +235,9 @@ page 51 (
             hot: true
             templateOptions: #DEFAULT#
         }
+        behavior {
+            warnOnUnsavedChanges: doNotCheck
+        }
     )
 
     dynamicAction cancel-dialog (

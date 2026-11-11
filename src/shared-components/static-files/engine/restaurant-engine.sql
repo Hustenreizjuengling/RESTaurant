@@ -2130,8 +2130,9 @@ declare
             rollback to restaurant_engine;
             -- show the first line of the message without the error number
             l_text := regexp_replace(regexp_substr(l_text, '^[^' || c_lf || ']*'), '^ORA-[0-9]+: ');
+            -- the message can contain names the user entered, so it is escaped
             apex_error.add_error(
-                p_message          => substr(l_text, 1, 4000),
+                p_message          => apex_escape.html(substr(l_text, 1, 4000)),
                 p_display_location => apex_error.c_inline_in_notification );
     end run;
 begin

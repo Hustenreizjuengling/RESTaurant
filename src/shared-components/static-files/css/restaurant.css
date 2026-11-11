@@ -241,3 +241,35 @@ a.rst-stat:hover, a.rst-stat:focus { border-color: var(--rst-accent); transform:
   background: color-mix(in srgb, var(--rst-put) 10%, transparent);
 }
 .rst-credentials p { margin: 0 0 .6rem; }
+
+/* ---------- source search ---------- */
+.rst-hit { display: flex; gap: .75rem; align-items: baseline; }
+.rst-hit-line { flex: 0 0 2.5rem; text-align: end; color: var(--rst-muted); font: .75rem var(--rst-mono); }
+.rst-hit .rst-mono { white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- line numbers of code fields ---------- */
+.rst-editor { display: flex; align-items: stretch; width: 100%; }
+.rst-editor textarea { flex: 1 1 auto; min-width: 0; border-start-start-radius: 0 !important; border-end-start-radius: 0 !important; }
+.rst-gutter {
+  flex: 0 0 auto;
+  min-width: 2.75rem;
+  padding: 4px .5rem 4px .25rem;
+  overflow: hidden;
+  border: 1px solid var(--rst-border);
+  border-inline-end: 0;
+  border-radius: 4px 0 0 4px;
+  background: color-mix(in srgb, var(--rst-muted) 8%, transparent);
+  color: var(--rst-muted);
+  font: .8125rem/1.5 var(--rst-mono);
+  text-align: end;
+  white-space: pre;
+  user-select: none;
+}
+/* keep the help button of a full width code field clear of the text */
+.t-Form-fieldContainer--hiddenLabel.rst-code.has-helpbutton .apex-item-group--textarea { margin-inline-end: 2rem; }
+
+/* ---------- about dialog ---------- */
+.rst-about { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+.rst-about img { border-radius: 16px; }
+.rst-about h2 { margin: 0 0 .25rem; font-size: 1.25rem; }
+.rst-about p { margin: 0; }

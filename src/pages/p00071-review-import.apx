@@ -382,6 +382,9 @@ page 71 (
             ]
             icon: fa-check
         }
+        behavior {
+            warnOnUnsavedChanges: doNotCheck
+        }
     )
 
     button back (

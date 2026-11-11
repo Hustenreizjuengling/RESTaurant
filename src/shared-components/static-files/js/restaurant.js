@@ -124,11 +124,46 @@
         });
     }
 
-    /* ---------- code fields: tab key indents ---------- */
+    /* ---------- code fields: line numbers, tab key indents ---------- */
+    function addLineNumbers(area) {
+        var editor = document.createElement("div"),
+            gutter = document.createElement("div"),
+            count = 0;
+
+        function update() {
+            var lines = area.value.split("\n").length, text = "", i;
+            if (lines !== count) {
+                for (i = 1; i <= lines; i += 1) {
+                    text += i + "\n";
+                }
+                gutter.textContent = text;
+                count = lines;
+            }
+            gutter.style.height = area.clientHeight + "px";
+            gutter.scrollTop = area.scrollTop;
+        }
+
+        editor.className = "rst-editor";
+        gutter.className = "rst-gutter";
+        gutter.setAttribute("aria-hidden", "true");
+        area.parentNode.insertBefore(editor, area);
+        editor.appendChild(gutter);
+        editor.appendChild(area);
+        area.addEventListener("input", update);
+        area.addEventListener("scroll", update);
+        if (window.ResizeObserver) {
+            new window.ResizeObserver(update).observe(area);
+        }
+        update();
+    }
+
     function initCode(area) {
         area.setAttribute("spellcheck", "false");
         area.setAttribute("autocapitalize", "off");
         area.setAttribute("autocomplete", "off");
+        if (area.rows >= 8) {
+            addLineNumbers(area);
+        }
         area.addEventListener("keydown", function (event) {
             if (event.key !== "Tab" || event.ctrlKey || event.altKey || event.metaKey) {
                 return;

@@ -27,6 +27,7 @@ case "${1:-}" in
   export)
     mkdir -p "$(dirname "$0")/../dist"
     printf 'apex export -applicationid %s -dir /repo/dist -skipexportdate -overwrite-files\nexit\n' "$APP_ID" | sqlcl "$CONNECT"
+    mv "$(dirname "$0")/../dist/f${APP_ID}.sql" "$(dirname "$0")/../dist/restaurant.sql"
     ;;
   sql)
     if [ -n "${2:-}" ]; then

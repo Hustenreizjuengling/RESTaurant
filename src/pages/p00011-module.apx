@@ -394,6 +394,9 @@ page 11 (
             hot: true
             templateOptions: #DEFAULT#
         }
+        behavior {
+            warnOnUnsavedChanges: doNotCheck
+        }
         serverSideCondition {
             type: itemIsNull
             item: P11_ID
@@ -412,6 +415,9 @@ page 11 (
             buttonTemplate: @/text
             hot: true
             templateOptions: #DEFAULT#
+        }
+        behavior {
+            warnOnUnsavedChanges: doNotCheck
         }
         serverSideCondition {
             type: itemIsNotNull

@@ -40,6 +40,21 @@ list navigation-menu (
         }
     )
 
+    entry search (
+        label: Search Source
+        icon {
+            imageIconCssClasses: fa-search
+        }
+        layout {
+            sequence: 25
+        }
+        link {
+            target: {
+                page: 16
+            }
+        }
+    )
+
     entry privileges (
         label: Privileges
         icon {

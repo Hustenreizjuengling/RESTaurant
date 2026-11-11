@@ -1,0 +1,54 @@
+page 90 (
+    name: About
+    alias: ABOUT
+    title: About RESTaurant
+    pageGroup: @administration
+    appearance {
+        pageMode: modalDialog
+        dialogTemplate: @/modal-dialog
+        templateOptions: #DEFAULT#
+    }
+    dialog {
+        width: 720
+        chained: false
+    }
+
+    region about (
+        name: About
+        type: staticContent
+        source {
+            htmlCode:
+                ```html
+                <div class="rst-about">
+                    <img src="#APP_FILES#icons/app-icon-192.png" alt="" width="72" height="72">
+                    <div>
+                        <h2>RESTaurant &APP_VERSION.</h2>
+                        <p>An editor for the RESTful services of Oracle REST Data Services. It runs completely inside this application and works on the schema the application is installed for.</p>
+                    </div>
+                </div>
+                <h3>How the pieces fit together</h3>
+                <dl class="rst-kv">
+                    <dt>Module</dt><dd>Container of a service with a base path, for example <span class="rst-mono">/orders/v1/</span>.</dd>
+                    <dt>Template</dt><dd>A URI pattern inside a module, for example <span class="rst-mono">orders/:id</span>.</dd>
+                    <dt>Handler</dt><dd>The query or code that answers one HTTP method of a template.</dd>
+                    <dt>Parameter</dt><dd>Maps a header, a URI value or the response to a bind variable of a handler.</dd>
+                    <dt>Privilege</dt><dd>Protects modules and URL patterns. Callers need one of its roles.</dd>
+                    <dt>Role</dt><dd>Granted to OAuth clients and users, assigned to privileges.</dd>
+                    <dt>OAuth client</dt><dd>An application that calls protected services with an access token.</dd>
+                </dl>
+                <h3>Export and import</h3>
+                <p>Modules, single templates and single handlers can be exported as JSON, as a SQL script or as a ZIP archive, and imported again in this or another schema. The JSON format is documented in the project repository, together with a JSON schema.</p>
+                <p><a href="https://github.com/Hustenreizjuengling/RESTaurant" target="_blank" rel="noopener">github.com/Hustenreizjuengling/RESTaurant</a></p>
+                ```
+        }
+        layout {
+            sequence: 10
+            slot: contentBody
+        }
+        appearance {
+            template: @/blank-with-attributes
+            templateOptions: #DEFAULT#
+        }
+    )
+
+)

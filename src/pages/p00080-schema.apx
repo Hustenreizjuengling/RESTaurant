@@ -234,6 +234,9 @@ page 80 (
             hot: true
             templateOptions: #DEFAULT#
         }
+        behavior {
+            warnOnUnsavedChanges: doNotCheck
+        }
     )
 
     button unregister (

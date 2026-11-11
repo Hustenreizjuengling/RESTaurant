@@ -168,6 +168,9 @@ page 70 (
             ]
             icon: fa-chevron-right
         }
+        behavior {
+            warnOnUnsavedChanges: doNotCheck
+        }
     )
 
     process load-export (

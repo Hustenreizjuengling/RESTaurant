@@ -10,6 +10,19 @@ page 12 (
     navigation {
         cursorFocus: doNotFocusCursor
     }
+    javaScript {
+        executeWhenPageLoads:
+            ```javascript
+            (function () {
+                function sync() {
+                    apex.item("P12_ETAG_QUERY")[apex.item("P12_ETAG_TYPE").getValue() === "QUERY" ? "show" : "hide"]();
+                }
+
+                apex.jQuery("#P12_ETAG_TYPE").on("change", sync);
+                sync();
+            })();
+            ```
+    }
     help {
         helpText: A resource template is a URI pattern inside a module. Each template has one handler per HTTP method.
     }
@@ -370,6 +383,9 @@ page 12 (
             hot: true
             templateOptions: #DEFAULT#
         }
+        behavior {
+            warnOnUnsavedChanges: doNotCheck
+        }
         serverSideCondition {
             type: itemIsNull
             item: P12_ID
@@ -388,6 +404,9 @@ page 12 (
             buttonTemplate: @/text
             hot: true
             templateOptions: #DEFAULT#
+        }
+        behavior {
+            warnOnUnsavedChanges: doNotCheck
         }
         serverSideCondition {
             type: itemIsNotNull
