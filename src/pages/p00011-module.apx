@@ -1,0 +1,654 @@
+page 11 (
+    name: Module
+    alias: MODULE
+    title: Module
+    pageGroup: @services
+    appearance {
+        pageTemplate: @/left-side-column
+        templateOptions: #DEFAULT#
+    }
+    navigation {
+        cursorFocus: doNotFocusCursor
+    }
+    help {
+        helpText: A resource module is the container of a RESTful service. Its base path is the first part of the URL of every template in the module.
+    }
+
+    region heading (
+        name: Heading
+        title: &P11_TITLE.
+        type: staticContent
+        source {
+            htmlCode: Resource module
+        }
+        layout {
+            sequence: 10
+            slot: breadcrumbBar
+        }
+        appearance {
+            template: @/hero
+            templateOptions: #DEFAULT#
+            icon: fa-cubes
+        }
+    )
+
+    region service-tree (
+        name: Service Tree
+        type: plugin/restaurantTree
+        layout {
+            sequence: 10
+            slot: leftColumn
+        }
+        appearance {
+            template: @/blank-with-attributes
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region endpoint (
+        name: Endpoint
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    l_url varchar2(4000);
+                begin
+                    select max(:G_REST_BASE || m.uri_prefix)
+                      into l_url
+                      from user_ords_modules m
+                     where m.id = :P11_ID;
+                    if l_url is null then
+                        return null;
+                    end if;
+                    return '<div class="rst-url"><span class="rst-url-text" id="rst-module-url">' || apex_escape.html(l_url) || '</span>'
+                        || '<a class="rst-icon-link" target="_blank" rel="noopener" title="Open the OpenAPI description of the module" href="'
+                        || apex_escape.html_attribute(regexp_replace(l_url, '([^/]+/)$', 'open-api-catalog/\1'))
+                        || '"><span class="fa fa-file-code-o" aria-hidden="true"></span></a>'
+                        || '<button type="button" class="rst-copy" data-copy-from="#rst-module-url" title="Copy URL" aria-label="Copy URL">'
+                        || '<span class="fa fa-copy" aria-hidden="true"></span></button></div>';
+                end;
+                ```
+        }
+        layout {
+            sequence: 20
+            slot: body
+        }
+        appearance {
+            template: @/blank-with-attributes
+            templateOptions: [
+                #DEFAULT#
+                margin-bottom-md
+            ]
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P11_ID
+        }
+    )
+
+    region module (
+        name: Module
+        title: Definition
+        type: staticContent
+        layout {
+            sequence: 30
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region templates (
+        name: Templates
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    l_html   clob;
+                    l_buffer varchar2(32767);
+                    l_count  pls_integer := 0;
+
+                    procedure p (p_text in varchar2) is
+                    begin
+                        if nvl(lengthb(l_buffer), 0) + nvl(lengthb(p_text), 0) > 32000 then
+                            dbms_lob.writeappend(l_html, length(l_buffer), l_buffer);
+                            l_buffer := null;
+                        end if;
+                        l_buffer := l_buffer || p_text;
+                    end p;
+                begin
+                    dbms_lob.createtemporary(l_html, true);
+                    p('<table class="rst-table"><thead><tr><th>URI template</th><th>Handlers</th><th class="rst-num">Priority</th><th>ETag</th><th>Changed</th><th></th></tr></thead><tbody>');
+                    for t in ( select id, uri_template, priority, etag_type, comments, updated_on, updated_by
+                                 from user_ords_templates
+                                where module_id = :P11_ID
+                                order by uri_template )
+                    loop
+                        l_count := l_count + 1;
+                        p('<tr><td><a class="rst-strong rst-path" href="' || apex_page.get_url(p_page => 12, p_items => 'P12_ID', p_values => t.id) || '">'
+                          || apex_escape.html(t.uri_template) || '</a>'
+                          || case when t.comments is not null then '<div class="rst-muted">' || apex_escape.html(t.comments) || '</div>' end
+                          || '</td><td><div class="rst-chips">');
+                        for h in ( select id, method
+                                     from user_ords_handlers
+                                    where template_id = t.id
+                                    order by decode(method, 'GET', 1, 'POST', 2, 'PUT', 3, 'DELETE', 4, 5) )
+                        loop
+                            p('<a class="rst-method rst-method--' || lower(apex_escape.html_attribute(h.method)) || '" href="'
+                              || apex_page.get_url(p_page => 13, p_items => 'P13_ID', p_values => h.id) || '">' || apex_escape.html(h.method) || '</a>');
+                        end loop;
+                        p('</div></td><td class="rst-num">' || t.priority || '</td><td>' || apex_escape.html(initcap(t.etag_type)) || '</td>'
+                          || '<td><span title="' || apex_escape.html_attribute(t.updated_by) || '">' || apex_escape.html(apex_util.get_since(t.updated_on)) || '</span></td>'
+                          || '<td class="rst-actions"><a class="rst-icon-link" title="Export as JSON" aria-label="Export as JSON" href="'
+                          || apex_page.get_url(p_page => 61, p_clear_cache => '61', p_items => 'P61_SCOPE,P61_ID,P61_FORMAT,P61_INCLUDE_SECURITY', p_values => 'TEMPLATE,' || t.id || ',JSON,Y')
+                          || '"><span class="fa fa-download" aria-hidden="true"></span></a></td></tr>');
+                    end loop;
+                    p('</tbody></table>');
+                    if l_count = 0 then
+                        p('<div class="rst-empty"><span class="fa fa-code" aria-hidden="true"></span>'
+                          || '<p>This module has no templates yet.</p>'
+                          || '<p class="rst-muted">A template is a URI pattern such as <span class="rst-path">orders/:id</span>.</p></div>');
+                    end if;
+                    if l_buffer is not null then
+                        dbms_lob.writeappend(l_html, length(l_buffer), l_buffer);
+                    end if;
+                    return l_html;
+                end;
+                ```
+        }
+        layout {
+            sequence: 40
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: [
+                #DEFAULT#
+                t-Region--noPadding
+                t-Region--scrollBody
+            ]
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P11_ID
+        }
+    )
+
+    pageItem P11_ID (
+        type: hidden
+        layout {
+            sequence: 10
+            region: @module
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P11_TITLE (
+        type: hidden
+        layout {
+            sequence: 20
+            region: @module
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: restricted
+        }
+    )
+
+    pageItem P11_NAME (
+        type: textField
+        label {
+            label: Module Name
+        }
+        layout {
+            sequence: 30
+            region: @module
+            slot: regionBody
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            valueRequired: true
+            maxLength: 255
+        }
+        help {
+            helpText: Unique name of the module, for example <strong>orders.v1</strong>. The name is case sensitive and not part of the URL.
+        }
+    )
+
+    pageItem P11_BASE_PATH (
+        type: textField
+        label {
+            label: Base Path
+        }
+        layout {
+            sequence: 40
+            region: @module
+            slot: regionBody
+            startNewRow: false
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+            cssClasses: rst-mono
+            valuePlaceholder: /orders/v1/
+        }
+        validation {
+            valueRequired: true
+            maxLength: 255
+        }
+        help {
+            helpText: First part of the URL of all templates of this module, for example <strong>/orders/v1/</strong>. Leading and trailing slashes are added automatically.
+        }
+    )
+
+    pageItem P11_STATUS (
+        type: switch
+        label {
+            label: Published
+        }
+        settings {
+            useDefaults: false
+            onValue: PUBLISHED
+            onLabel: Published
+            offValue: NOT_PUBLISHED
+            offLabel: Not published
+        }
+        layout {
+            sequence: 50
+            region: @module
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        default {
+            type: static
+            staticValue: PUBLISHED
+        }
+        help {
+            helpText: Only published modules can be called. Unpublish a module to take a service offline without deleting it.
+        }
+    )
+
+    pageItem P11_ITEMS_PER_PAGE (
+        type: numberField
+        label {
+            label: Pagination Size
+        }
+        layout {
+            sequence: 60
+            region: @module
+            slot: regionBody
+            startNewRow: false
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        default {
+            type: static
+            staticValue: 25
+        }
+        help {
+            helpText: Default number of rows that a GET handler returns per page. A handler can override this value.
+        }
+    )
+
+    pageItem P11_PRIVILEGE (
+        type: selectList
+        label {
+            label: Protected by Privilege
+        }
+        lov {
+            type: sqlQuery
+            sqlQuery:
+                ```sql
+                select name d, name r
+                  from user_ords_privileges
+                 where name not like 'oracle.%'
+                 order by 1
+                ```
+            displayExtraValues: true
+            displayNullValue: true
+            nullDisplayValue: - Public, no privilege -
+        }
+        layout {
+            sequence: 70
+            region: @module
+            slot: regionBody
+            startNewRow: false
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        help {
+            helpText: A module without a privilege is public. With a privilege, callers need one of the roles of that privilege.
+        }
+    )
+
+    pageItem P11_ORIGINS_ALLOWED (
+        type: textField
+        label {
+            label: Origins Allowed
+        }
+        layout {
+            sequence: 80
+            region: @module
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+            valuePlaceholder: https://app.example.com,https://other.example.com
+        }
+        validation {
+            maxLength: 4000
+        }
+        help {
+            helpText: Comma separated list of origins that may call this module from a browser (CORS). Leave empty to allow same origin requests only.
+        }
+    )
+
+    pageItem P11_COMMENTS (
+        type: textarea
+        label {
+            label: Comments
+        }
+        layout {
+            sequence: 90
+            region: @module
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+            height: 2
+        }
+        validation {
+            maxLength: 4000
+        }
+    )
+
+    button create (
+        buttonName: CREATE
+        label: Create Module
+        layout {
+            sequence: 10
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text
+            hot: true
+            templateOptions: #DEFAULT#
+        }
+        serverSideCondition {
+            type: itemIsNull
+            item: P11_ID
+        }
+    )
+
+    button save (
+        buttonName: SAVE
+        label: Save
+        layout {
+            sequence: 20
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text
+            hot: true
+            templateOptions: #DEFAULT#
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P11_ID
+        }
+    )
+
+    button duplicate (
+        buttonName: DUPLICATE
+        label: Duplicate
+        layout {
+            sequence: 30
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-clone
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 15
+                items: {
+                    P15_ID: &P11_ID.
+                }
+                clearCache: 15
+            }
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P11_ID
+        }
+    )
+
+    button export-json (
+        buttonName: EXPORT_JSON
+        label: Export
+        layout {
+            sequence: 40
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-download
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 60
+                items: {
+                    P60_SCOPE: MODULE
+                    P60_ID: &P11_ID.
+                }
+                clearCache: 60
+            }
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P11_ID
+        }
+    )
+
+    button delete (
+        buttonName: DELETE
+        label: Delete
+        layout {
+            sequence: 50
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: [
+                #DEFAULT#
+                t-Button--danger
+                t-Button--simple
+            ]
+        }
+        behavior {
+            executeValidations: false
+            warnOnUnsavedChanges: doNotCheck
+            requiresConfirmation: true
+        }
+        confirmation {
+            message: Delete the module &P11_NAME. with all of its templates and handlers?
+            style: danger
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P11_ID
+        }
+    )
+
+    button create-template (
+        buttonName: CREATE_TEMPLATE
+        label: Create Template
+        layout {
+            sequence: 10
+            region: @templates
+            slot: edit
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-plus
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 12
+                items: {
+                    P12_MODULE_ID: &P11_ID.
+                }
+                clearCache: 12
+            }
+        }
+    )
+
+    process load-module (
+        name: Load Module
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                :P11_TITLE := 'New Module';
+                for m in ( select m.name, m.uri_prefix, m.status, m.items_per_page, m.origins_allowed, m.comments,
+                                  ( select max(pm.privilege_name) from user_ords_privilege_modules pm where pm.module_id = m.id ) privilege_name
+                             from user_ords_modules m
+                            where m.id = :P11_ID )
+                loop
+                    :P11_TITLE           := m.name;
+                    :P11_NAME            := m.name;
+                    :P11_BASE_PATH       := m.uri_prefix;
+                    :P11_STATUS          := m.status;
+                    :P11_ITEMS_PER_PAGE  := m.items_per_page;
+                    :P11_ORIGINS_ALLOWED := m.origins_allowed;
+                    :P11_COMMENTS        := m.comments;
+                    :P11_PRIVILEGE       := m.privilege_name;
+                    return;
+                end loop;
+                -- the module was deleted in the meantime or a new one is created
+                :P11_ID := null;
+                ```
+        }
+        execution {
+            sequence: 10
+            point: beforeHeader
+        }
+        advanced {
+            executionMappingIdentifier: 1101
+        }
+    )
+
+    process save-module (
+        name: Save Module
+        type: plugin/restaurantEngine
+        settings {
+            action: MODULE_SAVE
+        }
+        execution {
+            sequence: 10
+        }
+        successMessage {
+            successMessage: Module saved.
+        }
+        serverSideCondition {
+            type: requestIsContainedInValue
+            value: CREATE,SAVE
+        }
+        advanced {
+            executionMappingIdentifier: 1102
+        }
+    )
+
+    process delete-module (
+        name: Delete Module
+        type: plugin/restaurantEngine
+        settings {
+            action: MODULE_DELETE
+        }
+        execution {
+            sequence: 20
+        }
+        successMessage {
+            successMessage: Module deleted.
+        }
+        serverSideCondition {
+            type: request=Value
+            value: DELETE
+        }
+        advanced {
+            executionMappingIdentifier: 1103
+        }
+    )
+
+    branch back-to-modules (
+        name: Back to Modules
+        execution {
+            sequence: 10
+        }
+        behavior {
+            target: {
+                page: 10
+            }
+        }
+        serverSideCondition {
+            type: request=Value
+            value: DELETE
+        }
+    )
+
+    branch stay-on-module (
+        name: Stay on Module
+        execution {
+            sequence: 20
+        }
+        behavior {
+            target: {
+                page: 11
+                items: {
+                    P11_ID: &P11_ID.
+                }
+            }
+        }
+    )
+
+)

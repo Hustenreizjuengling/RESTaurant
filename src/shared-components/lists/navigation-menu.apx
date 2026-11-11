@@ -1,0 +1,155 @@
+list navigation-menu (
+    name: Navigation Menu
+
+    entry dashboard (
+        label: Dashboard
+        icon {
+            imageIconCssClasses: fa-home
+        }
+        layout {
+            sequence: 10
+        }
+        link {
+            target: {
+                page: 1
+            }
+        }
+    )
+
+    entry modules (
+        label: Modules
+        icon {
+            imageIconCssClasses: fa-sitemap-horizontal
+        }
+        layout {
+            sequence: 20
+        }
+        link {
+            target: {
+                page: 10
+            }
+        }
+        isCurrent {
+            type: pages
+            pages: [
+                10
+                11
+                12
+                13
+            ]
+        }
+    )
+
+    entry privileges (
+        label: Privileges
+        icon {
+            imageIconCssClasses: fa-shield
+        }
+        layout {
+            sequence: 30
+        }
+        link {
+            target: {
+                page: 20
+            }
+        }
+    )
+
+    entry roles (
+        label: Roles
+        icon {
+            imageIconCssClasses: fa-users
+        }
+        layout {
+            sequence: 40
+        }
+        link {
+            target: {
+                page: 30
+            }
+        }
+    )
+
+    entry oauth-clients (
+        label: OAuth Clients
+        icon {
+            imageIconCssClasses: fa-key
+        }
+        layout {
+            sequence: 50
+        }
+        link {
+            target: {
+                page: 40
+            }
+        }
+    )
+
+    entry autorest (
+        label: AutoREST Objects
+        icon {
+            imageIconCssClasses: fa-table
+        }
+        layout {
+            sequence: 60
+        }
+        link {
+            target: {
+                page: 50
+            }
+        }
+    )
+
+    entry export (
+        label: Export
+        icon {
+            imageIconCssClasses: fa-download
+        }
+        layout {
+            sequence: 70
+        }
+        link {
+            target: {
+                page: 60
+            }
+        }
+    )
+
+    entry import (
+        label: Import
+        icon {
+            imageIconCssClasses: fa-upload
+        }
+        layout {
+            sequence: 80
+        }
+        link {
+            target: {
+                page: 70
+            }
+        }
+        isCurrent {
+            type: pages
+            pages: [
+                70
+                71
+            ]
+        }
+    )
+
+    entry schema (
+        label: Schema Settings
+        icon {
+            imageIconCssClasses: fa-gear
+        }
+        layout {
+            sequence: 90
+        }
+        link {
+            target: {
+                page: 80
+            }
+        }
+    )
+
+)

@@ -1,0 +1,27 @@
+appProcess set-rest-base (
+    name: Set REST Base URL
+    type: executeCode
+    execution {
+        point: beforeHeader
+        sequence: 10
+    }
+    source {
+        plsqlCode:
+            ```plsql
+            -- ORDS passes its own base URL to the database session. The services of
+            -- the schema are found below this URL, followed by the schema alias.
+            declare
+                l_base varchar2(4000) := owa_util.get_cgi_env('X-APEX-BASE');
+            begin
+                if l_base is null then
+                    l_base := regexp_replace(apex_util.host_url('SCRIPT'), '/r/[^/]+/[^/]+/?$', '/');
+                end if;
+                select max(rtrim(l_base, '/') || '/' || pattern)
+                  into :G_REST_BASE
+                  from user_ords_schemas
+                 where status = 'ENABLED';
+            end;
+            ```
+    }
+)
+

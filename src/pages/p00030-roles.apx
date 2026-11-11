@@ -1,0 +1,154 @@
+page 30 (
+    name: Roles
+    alias: ROLES
+    title: Roles
+    pageGroup: @security
+    appearance {
+        pageTemplate: @/standard
+        templateOptions: #DEFAULT#
+    }
+    navigation {
+        cursorFocus: doNotFocusCursor
+    }
+    help {
+        helpText: Roles are assigned to privileges and granted to OAuth clients or to users of the application server. A caller with one of the roles of a privilege may use what the privilege protects.
+    }
+
+    region heading (
+        name: Heading
+        title: Roles
+        type: staticContent
+        source {
+            htmlCode: Roles connect privileges with the OAuth clients and users that may use them.
+        }
+        layout {
+            sequence: 10
+            slot: breadcrumbBar
+        }
+        appearance {
+            template: @/hero
+            templateOptions: #DEFAULT#
+            icon: fa-users
+        }
+    )
+
+    region roles (
+        name: Roles
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    l_html      clob;
+                    l_buffer    varchar2(32767);
+                    l_schema_id number;
+
+                    procedure p (p_text in varchar2) is
+                    begin
+                        if nvl(lengthb(l_buffer), 0) + nvl(lengthb(p_text), 0) > 32000 then
+                            dbms_lob.writeappend(l_html, length(l_buffer), l_buffer);
+                            l_buffer := null;
+                        end if;
+                        l_buffer := l_buffer || p_text;
+                    end p;
+                begin
+                    dbms_lob.createtemporary(l_html, true);
+                    select max(id) into l_schema_id from user_ords_schemas;
+                    p('<div class="rst-toolbar"><input type="search" class="rst-filter" data-target="#rst-roles" placeholder="Filter roles" aria-label="Filter roles"></div>');
+                    p('<table class="rst-table" id="rst-roles"><thead><tr><th>Role</th><th>Kind</th><th>Used by privileges</th><th>Granted to clients</th></tr></thead><tbody>');
+                    for r in ( select id, name,
+                                      case when schema_id = l_schema_id and name not like 'oracle.%' then 'Y' else 'N' end custom
+                                 from user_ords_roles
+                                order by 3 desc, name )
+                    loop
+                        p('<tr><td>'
+                          || case when r.custom = 'Y'
+                                  then '<a class="rst-strong" href="' || apex_page.get_url(p_page => 31, p_items => 'P31_ID', p_values => r.id, p_clear_cache => '31') || '">' || apex_escape.html(r.name) || '</a>'
+                                  else apex_escape.html(r.name)
+                             end
+                          || '</td><td>' || case when r.custom = 'Y' then 'Custom' else '<span class="rst-muted">Built-in</span>' end
+                          || '</td><td><div class="rst-chips">');
+                        for v in ( select privilege_name from user_ords_privilege_roles where role_id = r.id order by privilege_name ) loop
+                            p('<span class="rst-chip">' || apex_escape.html(v.privilege_name) || '</span>');
+                        end loop;
+                        p('</div></td><td><div class="rst-chips">');
+                        for c in ( select client_name from user_ords_client_roles where role_id = r.id order by client_name ) loop
+                            p('<span class="rst-chip">' || apex_escape.html(c.client_name) || '</span>');
+                        end loop;
+                        p('</div></td></tr>');
+                    end loop;
+                    p('</tbody></table>');
+                    if l_buffer is not null then
+                        dbms_lob.writeappend(l_html, length(l_buffer), l_buffer);
+                    end if;
+                    return l_html;
+                end;
+                ```
+        }
+        layout {
+            sequence: 20
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: [
+                #DEFAULT#
+                t-Region--noPadding
+                t-Region--hideHeader js-addHiddenHeadingRoleDesc
+                t-Region--scrollBody
+            ]
+        }
+    )
+
+    button create (
+        buttonName: CREATE
+        label: Create Role
+        layout {
+            sequence: 10
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            hot: true
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-plus
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 31
+                clearCache: 31
+            }
+        }
+    )
+
+    dynamicAction dialog-closed (
+        name: Dialog Closed
+        execution {
+            sequence: 10
+        }
+        when {
+            event: apexafterclosedialog
+            selectionType: jsExpression
+            javaScriptExpression: document
+        }
+
+        action native-refresh (
+            action: refresh
+            affectedElements {
+                selectionType: region
+                region: @roles
+            }
+            execution {
+                sequence: 10
+                fireOnInit: false
+            }
+        )
+
+    )
+
+)

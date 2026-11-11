@@ -1,0 +1,55 @@
+# Local APEX test environment for RESTaurant.
+#
+#   docker compose -f dev/docker/compose.yaml up -d --build
+#
+# APEX : http://localhost:8282/ords/
+# DB   : localhost:1522/FREEPDB1
+#
+# The credentials below are throw-away defaults for a local sandbox.
+# Override them through the environment for anything else.
+name: restaurant-dev
+
+services:
+  db:
+    image: gvenzl/oracle-free:latest
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD:-Oracle_4U}
+    ports:
+      - "127.0.0.1:${DB_PORT:-1522}:1521"
+    volumes:
+      - oradata:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 60s
+
+  ords:
+    build:
+      context: .
+      args:
+        APEX_URL: ${APEX_URL:-https://download.oracle.com/otn_software/apex/apex_26.2.zip}
+    image: restaurant/ords-apex:${APEX_TAG:-26.2}
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: "1521"
+      PDB_NAME: FREEPDB1
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD:-Oracle_4U}
+      ORDS_PUBLIC_USER_PASSWORD: ${ORDS_PUBLIC_USER_PASSWORD:-Oracle_4U}
+      APEX_ADMIN_PASSWORD: ${APEX_ADMIN_PASSWORD:-Welcome_2U!}
+      APEX_INSTALL_MODE: ${APEX_INSTALL_MODE:-auto}
+    ports:
+      - "127.0.0.1:${HTTP_PORT:-8282}:8181"
+    volumes:
+      - ordsconfig:/etc/ords/config
+      # the repository, so that SQLcl inside the container can validate,
+      # import and export the application sources
+      - ../..:/repo
+
+volumes:
+  oradata:
+  ordsconfig:

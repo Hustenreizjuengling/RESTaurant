@@ -1,0 +1,386 @@
+page 60 (
+    name: Export
+    alias: EXPORT
+    title: Export
+    pageGroup: @transfer
+    appearance {
+        pageTemplate: @/standard
+        templateOptions: #DEFAULT#
+    }
+    navigation {
+        cursorFocus: doNotFocusCursor
+        warnOnUnsavedChanges: false
+    }
+    javaScript {
+        executeWhenPageLoads:
+            ```javascript
+            (function () {
+                var scope = apex.item("P60_SCOPE"),
+                    format = apex.item("P60_FORMAT");
+
+                function sync() {
+                    var value = scope.getValue(),
+                        single = value === "TEMPLATE" || value === "HANDLER";
+                    apex.item("P60_MODULES")[value === "MODULES" ? "show" : "hide"]();
+                    apex.item("P60_INCLUDE_SECURITY")[single ? "hide" : "show"]();
+                    // an archive with one file per module needs whole modules
+                    apex.jQuery("#P60_FORMAT input[value='ZIP']").closest(".apex-item-option").toggle(value === "SCHEMA" || value === "MODULES");
+                    if (single && format.getValue() === "ZIP") {
+                        format.setValue("JSON");
+                    }
+                }
+
+                apex.jQuery("#P60_SCOPE").on("change", sync);
+                sync();
+            })();
+            ```
+    }
+    help {
+        helpText:
+            ```html
+            <p>Exports modules, single templates or single handlers.</p>
+            <p><strong>JSON</strong> is the RESTaurant exchange format. It is the format the import of this application reads, it has a fixed layout and keeps source code as one line per entry, so it is easy to review and to keep under version control.</p>
+            <p><strong>SQL script</strong> contains calls of the ORDS API and can be run with SQLcl or SQL*Plus without this application.</p>
+            <p><strong>ZIP archive</strong> contains one JSON file per module.</p>
+            ```
+    }
+
+    region heading (
+        name: Heading
+        title: Export
+        type: staticContent
+        source {
+            htmlCode: Save RESTful services as a file to move them to another schema or to keep them under version control.
+        }
+        layout {
+            sequence: 10
+            slot: breadcrumbBar
+        }
+        appearance {
+            template: @/hero
+            templateOptions: #DEFAULT#
+            icon: fa-download
+        }
+    )
+
+    region options (
+        name: Options
+        title: What to export
+        type: staticContent
+        layout {
+            sequence: 20
+            slot: body
+            columnSpan: 4
+        }
+        appearance {
+            template: @/standard
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region preview (
+        name: Preview
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    c_limit constant pls_integer := 200000;
+                    l_html  clob;
+                begin
+                    for d in ( select c002 file_name, clob001 content, dbms_lob.getlength(clob001) length
+                                 from apex_collections
+                                where collection_name = 'RESTAURANT_DOC'
+                                  and c001 = 'EXPORT' )
+                    loop
+                        l_html := '<div class="rst-toolbar"><span class="fa fa-file-code-o" aria-hidden="true"></span> <span class="rst-mono rst-strong">'
+                            || apex_escape.html(d.file_name) || '</span><span class="rst-muted">' || to_char(d.length, 'fm999G999G999G990') || ' characters'
+                            || case when d.file_name like '%.zip' then ' · the archive contains this content as one file per module' end
+                            || '</span><span style="flex:1"></span>'
+                            || '<button type="button" class="t-Button t-Button--small rst-copy" data-copy-from="#rst-export-preview">'
+                            || '<span class="fa fa-copy" aria-hidden="true"></span> Copy</button></div>'
+                            || '<pre class="rst-preview" id="rst-export-preview">';
+                        if d.length > c_limit then
+                            l_html := l_html || apex_escape.html_clob(dbms_lob.substr(d.content, 32000, 1));
+                            l_html := l_html || '</pre><p class="rst-muted" style="padding:.75rem 1rem">The preview shows the beginning of the export only. The download is complete.</p>';
+                        else
+                            l_html := l_html || apex_escape.html_clob(d.content) || '</pre>';
+                        end if;
+                    end loop;
+                    return nvl(l_html, to_clob('<div class="rst-empty"><p class="rst-muted">Nothing to preview.</p></div>'));
+                end;
+                ```
+        }
+        layout {
+            sequence: 30
+            slot: body
+            startNewRow: false
+        }
+        appearance {
+            template: @/standard
+            templateOptions: [
+                #DEFAULT#
+                t-Region--noPadding
+                t-Region--scrollBody
+            ]
+        }
+    )
+
+    pageItem P60_ID (
+        type: hidden
+        layout {
+            sequence: 10
+            region: @options
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P60_SCOPE (
+        type: radioGroup
+        label {
+            label: Scope
+        }
+        lov {
+            type: sqlQuery
+            sqlQuery:
+                ```sql
+                select d, r
+                  from ( select 'All modules of the schema' d, 'SCHEMA' r, 1 pos from dual
+                         union all
+                         select 'Selected modules', 'MODULES', 2 from dual
+                         union all
+                         select 'Module ' || name, 'MODULE', 3 from user_ords_modules where id = :P60_ID and :P60_SCOPE = 'MODULE'
+                         union all
+                         select 'Template ' || uri_template, 'TEMPLATE', 4 from user_ords_templates where id = :P60_ID and :P60_SCOPE = 'TEMPLATE'
+                         union all
+                         select 'Handler ' || h.method || ' ' || t.uri_template, 'HANDLER', 5
+                           from user_ords_handlers h
+                           join user_ords_templates t on t.id = h.template_id
+                          where h.id = :P60_ID and :P60_SCOPE = 'HANDLER' )
+                 order by pos
+                ```
+            displayExtraValues: false
+            displayNullValue: false
+        }
+        layout {
+            sequence: 20
+            region: @options
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-above
+            templateOptions: #DEFAULT#
+        }
+        default {
+            type: static
+            staticValue: SCHEMA
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P60_MODULES (
+        type: checkboxGroup
+        label {
+            label: Modules
+        }
+        lov {
+            type: sqlQuery
+            sqlQuery:
+                ```sql
+                select name d, id r
+                  from user_ords_modules
+                 order by 1
+                ```
+            displayExtraValues: false
+        }
+        layout {
+            sequence: 30
+            region: @options
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-above
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    pageItem P60_FORMAT (
+        type: radioGroup
+        label {
+            label: Format
+        }
+        lov {
+            type: staticValues
+            staticValues: STATIC2:JSON - the RESTaurant exchange format;JSON,SQL script with ORDS API calls;SQL,ZIP archive with one JSON file per module;ZIP
+            displayNullValue: false
+        }
+        layout {
+            sequence: 40
+            region: @options
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-above
+            templateOptions: #DEFAULT#
+        }
+        default {
+            type: static
+            staticValue: JSON
+        }
+    )
+
+    pageItem P60_INCLUDE_SECURITY (
+        type: switch
+        label {
+            label: Include privileges and roles
+        }
+        settings {
+            useDefaults: false
+            onValue: Y
+            onLabel: Yes
+            offValue: N
+            offLabel: No
+        }
+        layout {
+            sequence: 50
+            region: @options
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-above
+            templateOptions: #DEFAULT#
+        }
+        default {
+            type: static
+            staticValue: Y
+        }
+        help {
+            helpText: Adds the privileges that protect the exported modules and the roles of these privileges. A schema export contains all privileges and roles you defined.
+        }
+    )
+
+    pageItem P60_INCLUDE_META (
+        type: switch
+        label {
+            label: Add export details
+        }
+        settings {
+            useDefaults: false
+            onValue: Y
+            onLabel: Yes
+            offValue: N
+            offLabel: No
+        }
+        layout {
+            sequence: 60
+            region: @options
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-above
+            templateOptions: #DEFAULT#
+        }
+        default {
+            type: static
+            staticValue: N
+        }
+        help {
+            helpText: Adds the time of the export, the schema and the ORDS version to the file. Leave this off for files under version control, then the same services always produce the same file.
+        }
+    )
+
+    button download (
+        buttonName: DOWNLOAD
+        label: Download
+        layout {
+            sequence: 10
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            hot: true
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-download
+        }
+    )
+
+    button preview (
+        buttonName: PREVIEW
+        label: Refresh Preview
+        layout {
+            sequence: 20
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-refresh
+        }
+    )
+
+    process build-preview (
+        name: Build Preview
+        type: plugin/restaurantEngine
+        settings {
+            action: EXPORT_PREVIEW
+        }
+        execution {
+            sequence: 10
+            point: beforeHeader
+        }
+        advanced {
+            executionMappingIdentifier: 6001
+        }
+    )
+
+    branch download (
+        name: Download
+        execution {
+            sequence: 10
+        }
+        behavior {
+            target: {
+                page: 61
+                items: {
+                    P61_SCOPE: &P60_SCOPE.
+                    P61_ID: &P60_ID.
+                    P61_MODULES: \&P60_MODULES.\
+                    P61_FORMAT: &P60_FORMAT.
+                    P61_INCLUDE_SECURITY: &P60_INCLUDE_SECURITY.
+                    P61_INCLUDE_META: &P60_INCLUDE_META.
+                }
+                clearCache: 61
+            }
+        }
+        serverSideCondition {
+            type: request=Value
+            value: DOWNLOAD
+        }
+    )
+
+    branch refresh (
+        name: Refresh
+        execution {
+            sequence: 20
+        }
+        behavior {
+            target: {
+                page: 60
+            }
+        }
+    )
+
+)

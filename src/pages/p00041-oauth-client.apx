@@ -1,0 +1,730 @@
+page 41 (
+    name: OAuth Client
+    alias: OAUTH-CLIENT
+    title: OAuth Client
+    pageGroup: @security
+    appearance {
+        pageMode: modalDialog
+        dialogTemplate: @/modal-dialog
+        templateOptions: #DEFAULT#
+    }
+    dialog {
+        width: 780
+        chained: false
+    }
+    help {
+        helpText:
+            ```html
+            <p><strong>Client credentials</strong> is the grant type for server to server calls: the client exchanges its ID and secret for an access token.</p>
+            <p><strong>Authorization code</strong> and <strong>Implicit</strong> involve a user who approves the access in the browser. These grant types need a redirect URI and a description.</p>
+            <p>The client secret is shown once, right after it was generated. Generate a new secret if it is lost.</p>
+            ```
+    }
+
+    region credentials (
+        name: Credentials
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    l_client_id varchar2(255);
+                    l_secret    varchar2(4000) := v('P41_SECRET');
+                    l_html      varchar2(32767);
+                begin
+                    select max(client_id) into l_client_id from user_ords_clients where id = :P41_ID;
+                    if l_client_id is null then
+                        return null;
+                    end if;
+                    l_html := '<div class="rst-credentials' || case when l_secret is not null then ' is-new' end || '">';
+                    if l_secret is not null then
+                        l_html := l_html || '<p class="rst-strong"><span class="fa fa-exclamation-triangle" aria-hidden="true"></span> '
+                            || 'Copy the client secret now. It is not shown again.</p>';
+                    end if;
+                    l_html := l_html || '<dl class="rst-kv"><dt>Client ID</dt><dd><span class="rst-mono" id="rst-client-id">' || apex_escape.html(l_client_id) || '</span>'
+                        || ' <button type="button" class="rst-copy" data-copy-from="#rst-client-id" title="Copy" aria-label="Copy client ID"><span class="fa fa-copy" aria-hidden="true"></span></button></dd>';
+                    if l_secret is not null then
+                        l_html := l_html || '<dt>Client secret</dt><dd><span class="rst-mono" id="rst-client-secret">' || apex_escape.html(l_secret) || '</span>'
+                            || ' <button type="button" class="rst-copy" data-copy-from="#rst-client-secret" title="Copy" aria-label="Copy client secret"><span class="fa fa-copy" aria-hidden="true"></span></button></dd>';
+                    end if;
+                    if :G_REST_BASE is not null then
+                        l_html := l_html || '<dt>Token URL</dt><dd><span class="rst-mono" id="rst-token-url">' || apex_escape.html(:G_REST_BASE || '/oauth/token') || '</span>'
+                            || ' <button type="button" class="rst-copy" data-copy-from="#rst-token-url" title="Copy" aria-label="Copy token URL"><span class="fa fa-copy" aria-hidden="true"></span></button></dd>';
+                    end if;
+                    return l_html || '</dl></div>';
+                end;
+                ```
+        }
+        layout {
+            sequence: 10
+            slot: contentBody
+        }
+        appearance {
+            template: @/blank-with-attributes
+            templateOptions: #DEFAULT#
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P41_ID
+        }
+    )
+
+    region client (
+        name: Client
+        type: staticContent
+        layout {
+            sequence: 20
+            slot: contentBody
+        }
+        appearance {
+            template: @/blank-with-attributes
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region buttons (
+        name: Buttons
+        type: staticContent
+        layout {
+            sequence: 30
+            slot: dialogFooter
+        }
+        appearance {
+            template: @/buttons-container
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    pageItem P41_ID (
+        type: hidden
+        layout {
+            sequence: 10
+            region: @client
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P41_NEW_SECRET (
+        type: hidden
+        layout {
+            sequence: 20
+            region: @client
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: restricted
+        }
+    )
+
+    pageItem P41_SECRET (
+        type: hidden
+        layout {
+            sequence: 30
+            region: @client
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: restricted
+        }
+        sessionState {
+            storage: request
+        }
+    )
+
+    pageItem P41_NAME (
+        type: textField
+        label {
+            label: Name
+        }
+        layout {
+            sequence: 40
+            region: @client
+            slot: regionBody
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            valueRequired: true
+            maxLength: 255
+        }
+        help {
+            helpText: Unique name of the client. Users see it when they are asked to approve access.
+        }
+    )
+
+    pageItem P41_GRANT_TYPE (
+        type: selectList
+        label {
+            label: Grant Type
+        }
+        lov {
+            type: staticValues
+            staticValues: STATIC2:Client credentials;client_credentials,Authorization code;authorization_code,Implicit;implicit
+            displayNullValue: false
+        }
+        layout {
+            sequence: 50
+            region: @client
+            slot: regionBody
+            startNewRow: false
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+        }
+        default {
+            type: static
+            staticValue: client_credentials
+        }
+        readOnly {
+            type: itemIsNotNull
+            item: P41_ID
+        }
+        help {
+            helpText: The OAuth 2.0 flow of the client. It cannot be changed after the client was registered.
+        }
+    )
+
+    pageItem P41_SUPPORT_EMAIL (
+        type: textField
+        label {
+            label: Support Email
+        }
+        settings {
+            subtype: email
+        }
+        layout {
+            sequence: 60
+            region: @client
+            slot: regionBody
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            valueRequired: true
+            maxLength: 255
+        }
+        help {
+            helpText: Address where users can reach the owner of the client.
+        }
+    )
+
+    pageItem P41_SUPPORT_URI (
+        type: textField
+        label {
+            label: Support URI
+        }
+        layout {
+            sequence: 70
+            region: @client
+            slot: regionBody
+            startNewRow: false
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            maxLength: 2000
+        }
+    )
+
+    pageItem P41_DESCRIPTION (
+        type: textField
+        label {
+            label: Description
+        }
+        layout {
+            sequence: 80
+            region: @client
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            maxLength: 4000
+        }
+        help {
+            helpText: Purpose of the client. Required for the grant types authorization code and implicit, where it is shown to the user.
+        }
+    )
+
+    pageItem P41_REDIRECT_URI (
+        type: textField
+        label {
+            label: Redirect URI
+        }
+        layout {
+            sequence: 90
+            region: @client
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            maxLength: 2000
+        }
+        help {
+            helpText: URL of the client that receives the authorization code or the access token. Required for the grant types authorization code and implicit.
+        }
+    )
+
+    pageItem P41_ORIGINS_ALLOWED (
+        type: textField
+        label {
+            label: Origins Allowed
+        }
+        layout {
+            sequence: 100
+            region: @client
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            maxLength: 4000
+        }
+        help {
+            helpText: Comma separated list of origins the client may send browser requests from.
+        }
+    )
+
+    pageItem P41_PRIVILEGES (
+        type: selectMany
+        label {
+            label: Privileges
+        }
+        lov {
+            type: sqlQuery
+            sqlQuery:
+                ```sql
+                select name d, name r
+                  from user_ords_privileges
+                 where name not like 'oracle.%'
+                    or name in ( select cp.name from user_ords_client_privileges cp where cp.client_priv_client_id = :P41_ID )
+                 order by 1
+                ```
+        }
+        layout {
+            sequence: 110
+            region: @client
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        multipleValues {
+            type: delimitedList
+            separator: :
+        }
+        help {
+            helpText: Privileges the client asks for as scopes. Needed for the grant types that involve a user.
+        }
+    )
+
+    pageItem P41_ROLES (
+        type: selectMany
+        label {
+            label: Roles
+        }
+        lov {
+            type: sqlQuery
+            sqlQuery:
+                ```sql
+                select name d, name r
+                  from user_ords_roles
+                 order by case when name like 'oracle.%' then 2 else 1 end, name
+                ```
+        }
+        layout {
+            sequence: 120
+            region: @client
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        multipleValues {
+            type: delimitedList
+            separator: :
+        }
+        help {
+            helpText: Roles granted to the client. With the grant type client credentials the roles decide which protected services the client may call.
+        }
+    )
+
+    button close (
+        buttonName: CLOSE
+        label: Close
+        layout {
+            sequence: 10
+            region: @buttons
+            slot: close
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: #DEFAULT#
+        }
+        behavior {
+            action: definedByDynamicAction
+        }
+    )
+
+    button delete (
+        buttonName: DELETE
+        label: Delete
+        layout {
+            sequence: 20
+            region: @buttons
+            slot: delete
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: [
+                #DEFAULT#
+                t-Button--danger
+                t-Button--simple
+            ]
+        }
+        behavior {
+            executeValidations: false
+            warnOnUnsavedChanges: doNotCheck
+            requiresConfirmation: true
+        }
+        confirmation {
+            message: Delete this client? Applications that use it can no longer get access tokens.
+            style: danger
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P41_ID
+        }
+    )
+
+    button rotate (
+        buttonName: ROTATE
+        label: Generate New Secret
+        layout {
+            sequence: 30
+            region: @buttons
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: #DEFAULT#
+        }
+        behavior {
+            executeValidations: false
+            warnOnUnsavedChanges: doNotCheck
+            requiresConfirmation: true
+        }
+        confirmation {
+            message: Generate a new client secret? The current secret stops working.
+            style: warning
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P41_ID
+        }
+    )
+
+    button create (
+        buttonName: CREATE
+        label: Register Client
+        layout {
+            sequence: 40
+            region: @buttons
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text
+            hot: true
+            templateOptions: #DEFAULT#
+        }
+        serverSideCondition {
+            type: itemIsNull
+            item: P41_ID
+        }
+    )
+
+    button save (
+        buttonName: SAVE
+        label: Save
+        layout {
+            sequence: 50
+            region: @buttons
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text
+            hot: true
+            templateOptions: #DEFAULT#
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P41_ID
+        }
+    )
+
+    dynamicAction close-dialog (
+        name: Close Dialog
+        execution {
+            sequence: 10
+        }
+        when {
+            event: click
+            selectionType: button
+            button: @close
+        }
+
+        action native-close-dialog (
+            action: closeDialog
+            execution {
+                sequence: 10
+                fireOnInit: false
+            }
+        )
+
+    )
+
+    process load-client (
+        name: Load Client
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                -- a new secret is handed over once and then forgotten
+                :P41_SECRET     := :P41_NEW_SECRET;
+                :P41_NEW_SECRET := null;
+                for c in ( select name, description, auth_flow, support_email, support_uri, redirect_uri, allowed_origins
+                             from user_ords_clients
+                            where id = :P41_ID )
+                loop
+                    :P41_NAME            := c.name;
+                    :P41_DESCRIPTION     := c.description;
+                    :P41_GRANT_TYPE      := case c.auth_flow
+                                                when 'CLIENT_CRED' then 'client_credentials'
+                                                when 'AUTH_CODE'   then 'authorization_code'
+                                                when 'IMPLICIT'    then 'implicit'
+                                            end;
+                    :P41_SUPPORT_EMAIL   := c.support_email;
+                    :P41_SUPPORT_URI     := c.support_uri;
+                    :P41_REDIRECT_URI    := c.redirect_uri;
+                    :P41_ORIGINS_ALLOWED := c.allowed_origins;
+                    select listagg(role_name, ':') within group (order by role_name)
+                      into :P41_ROLES
+                      from user_ords_client_roles
+                     where client_id = :P41_ID;
+                    select listagg(name, ':') within group (order by name)
+                      into :P41_PRIVILEGES
+                      from user_ords_client_privileges
+                     where client_priv_client_id = :P41_ID;
+                end loop;
+                ```
+        }
+        execution {
+            sequence: 10
+            point: beforeHeader
+        }
+        advanced {
+            executionMappingIdentifier: 4101
+        }
+    )
+
+    process save-client (
+        name: Save Client
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                declare
+                    l_old_name   varchar2(255);
+                    l_count      number;
+                    l_privileges varchar2(4000) := replace(:P41_PRIVILEGES, ':', ',');
+                    l_roles      apex_t_varchar2 := apex_string.split(:P41_ROLES, ':');
+
+                    procedure invalid (p_message in varchar2, p_item in varchar2) is
+                    begin
+                        apex_error.add_error(
+                            p_message          => p_message,
+                            p_display_location => apex_error.c_inline_with_field_and_notif,
+                            p_page_item_name   => p_item );
+                    end invalid;
+                begin
+                    :P41_NAME := trim(:P41_NAME);
+                    select count(*) into l_count from user_ords_clients
+                     where name = :P41_NAME and ( :P41_ID is null or id <> :P41_ID );
+                    if l_count > 0 then
+                        invalid('A client with this name already exists.', 'P41_NAME');
+                    end if;
+                    if :P41_GRANT_TYPE <> 'client_credentials' then
+                        if :P41_REDIRECT_URI is null then
+                            invalid('This grant type needs a redirect URI.', 'P41_REDIRECT_URI');
+                        end if;
+                        if :P41_DESCRIPTION is null then
+                            invalid('This grant type needs a description.', 'P41_DESCRIPTION');
+                        end if;
+                    end if;
+                    if apex_error.have_errors_occurred then
+                        return;
+                    end if;
+
+                    if :P41_ID is null then
+                        ords_security.register_client(
+                            p_name            => :P41_NAME,
+                            p_grant_type      => :P41_GRANT_TYPE,
+                            p_support_email   => :P41_SUPPORT_EMAIL,
+                            p_description     => :P41_DESCRIPTION,
+                            p_privilege_names => l_privileges,
+                            p_origins_allowed => :P41_ORIGINS_ALLOWED,
+                            p_redirect_uri    => :P41_REDIRECT_URI,
+                            p_support_uri     => :P41_SUPPORT_URI );
+                        if :P41_GRANT_TYPE <> 'implicit' then
+                            :P41_NEW_SECRET := ords_security.rotate_client_secret(p_name => :P41_NAME);
+                        end if;
+                    else
+                        select name into l_old_name from user_ords_clients where id = :P41_ID;
+                        ords_security.update_client(
+                            p_name            => l_old_name,
+                            p_new_name        => nullif(:P41_NAME, l_old_name),
+                            p_description     => :P41_DESCRIPTION,
+                            p_origins_allowed => :P41_ORIGINS_ALLOWED,
+                            p_redirect_uri    => :P41_REDIRECT_URI,
+                            p_support_email   => :P41_SUPPORT_EMAIL,
+                            p_support_uri     => :P41_SUPPORT_URI );
+                        ords_security.update_client_privileges(
+                            p_name            => :P41_NAME,
+                            p_privilege_names => l_privileges );
+                    end if;
+
+                    select id into :P41_ID from user_ords_clients where name = :P41_NAME;
+
+                    for r in ( select role_name
+                                 from user_ords_client_roles
+                                where client_id = :P41_ID
+                                  and role_name not in ( select column_value from table(l_roles) ) )
+                    loop
+                        ords_security.revoke_client_role(p_client_name => :P41_NAME, p_role_name => r.role_name);
+                    end loop;
+                    for r in ( select column_value role_name
+                                 from table(l_roles)
+                                where column_value is not null
+                                  and column_value not in ( select role_name from user_ords_client_roles where client_id = :P41_ID ) )
+                    loop
+                        ords_security.grant_client_role(p_client_name => :P41_NAME, p_role_name => r.role_name);
+                    end loop;
+                end;
+                ```
+        }
+        execution {
+            sequence: 10
+        }
+        successMessage {
+            successMessage: Client saved.
+        }
+        serverSideCondition {
+            type: requestIsContainedInValue
+            value: CREATE,SAVE
+        }
+        advanced {
+            executionMappingIdentifier: 4102
+        }
+    )
+
+    process rotate-secret (
+        name: Generate New Secret
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                for c in ( select name from user_ords_clients where id = :P41_ID ) loop
+                    :P41_NEW_SECRET := ords_security.rotate_client_secret(
+                                           p_name            => c.name,
+                                           p_revoke_existing => true );
+                end loop;
+                ```
+        }
+        execution {
+            sequence: 20
+        }
+        successMessage {
+            successMessage: New client secret generated.
+        }
+        serverSideCondition {
+            type: request=Value
+            value: ROTATE
+        }
+        advanced {
+            executionMappingIdentifier: 4103
+        }
+    )
+
+    process delete-client (
+        name: Delete Client
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                for c in ( select name from user_ords_clients where id = :P41_ID ) loop
+                    ords_security.delete_client(p_name => c.name);
+                end loop;
+                ```
+        }
+        execution {
+            sequence: 30
+        }
+        serverSideCondition {
+            type: request=Value
+            value: DELETE
+        }
+        advanced {
+            executionMappingIdentifier: 4104
+        }
+    )
+
+    process close-dialog (
+        name: Close Dialog
+        type: closeDialog
+        execution {
+            sequence: 40
+        }
+        serverSideCondition {
+            type: request=Value
+            value: DELETE
+        }
+        advanced {
+            executionMappingIdentifier: 4105
+        }
+    )
+
+    branch stay (
+        name: Stay on Client
+        execution {
+            sequence: 10
+        }
+        behavior {
+            target: {
+                page: 41
+                items: {
+                    P41_ID: &P41_ID.
+                }
+            }
+        }
+    )
+
+)

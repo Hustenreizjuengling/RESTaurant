@@ -1,0 +1,327 @@
+page 1 (
+    name: Dashboard
+    alias: HOME
+    title: Dashboard
+    appearance {
+        pageTemplate: @/standard
+        templateOptions: #DEFAULT#
+    }
+    navigation {
+        cursorFocus: doNotFocusCursor
+    }
+    help {
+        helpText: Overview of the RESTful services of the schema. Use the tiles to jump to the lists and the buttons to create, import or export services.
+    }
+
+    region heading (
+        name: Heading
+        title: RESTaurant
+        type: staticContent
+        source {
+            htmlCode: RESTful services of the schema <strong>&P1_SCHEMA.</strong>, served by Oracle REST Data Services.
+        }
+        layout {
+            sequence: 10
+            slot: breadcrumbBar
+        }
+        appearance {
+            template: @/hero
+            templateOptions: #DEFAULT#
+        }
+        image {
+            fileUrl: #APP_FILES#icons/app-icon-192.png
+        }
+    )
+
+    region not-enabled (
+        name: Schema Not Enabled
+        title: The schema is not REST enabled
+        type: staticContent
+        source {
+            htmlCode: Services of this schema cannot be called yet. Enable the schema for Oracle REST Data Services first. <a href="&P1_SCHEMA_URL!ATTR.">Open the schema settings</a>
+        }
+        layout {
+            sequence: 20
+            slot: body
+        }
+        appearance {
+            template: @/alert
+            templateOptions: [
+                #DEFAULT#
+                t-Alert--horizontal
+                t-Alert--defaultIcons
+                t-Alert--warning
+            ]
+        }
+        serverSideCondition {
+            type: itemIsNull
+            item: G_REST_BASE
+        }
+    )
+
+    region statistics (
+        name: Statistics
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    l_html      varchar2(32767);
+                    l_schema_id number;
+
+                    procedure tile (p_page in number, p_icon in varchar2, p_value in varchar2, p_label in varchar2, p_hint in varchar2 default null) is
+                    begin
+                        l_html := l_html
+                            || '<a class="rst-stat" href="' || apex_page.get_url(p_page => p_page) || '">'
+                            || '<span class="rst-stat-icon fa ' || p_icon || '" aria-hidden="true"></span>'
+                            || '<span class="rst-stat-value">' || apex_escape.html(p_value) || '</span>'
+                            || '<span class="rst-stat-label">' || apex_escape.html(p_label) || '</span>'
+                            || case when p_hint is not null then '<span class="rst-muted">' || apex_escape.html(p_hint) || '</span>' end
+                            || '</a>';
+                    end tile;
+                begin
+                    select max(id) into l_schema_id from user_ords_schemas;
+                    l_html := '<div class="rst-stats">';
+                    for s in ( select ( select count(*) from user_ords_modules ) modules,
+                                      ( select count(*) from user_ords_modules where status <> 'PUBLISHED' ) unpublished,
+                                      ( select count(*) from user_ords_templates ) templates,
+                                      ( select count(*) from user_ords_handlers ) handlers,
+                                      ( select count(*) from user_ords_privileges where schema_id = l_schema_id and name not like 'oracle.%' ) privileges,
+                                      ( select count(*) from user_ords_roles where schema_id = l_schema_id and name not like 'oracle.%' ) roles,
+                                      ( select count(*) from user_ords_clients ) clients,
+                                      ( select count(*) from user_ords_enabled_objects ) objects
+                                 from dual )
+                    loop
+                        tile(10, 'fa-cubes', s.modules, 'Modules', case when s.unpublished > 0 then s.unpublished || ' not published' end);
+                        tile(10, 'fa-code', s.templates, 'Templates');
+                        tile(10, 'fa-bolt', s.handlers, 'Handlers');
+                        tile(20, 'fa-shield', s.privileges, 'Privileges');
+                        tile(30, 'fa-users', s.roles, 'Roles');
+                        tile(40, 'fa-key', s.clients, 'OAuth clients');
+                        tile(50, 'fa-table', s.objects, 'AutoREST objects');
+                    end loop;
+                    return l_html || '</div>';
+                end;
+                ```
+        }
+        layout {
+            sequence: 30
+            slot: body
+        }
+        appearance {
+            template: @/blank-with-attributes
+            templateOptions: [
+                #DEFAULT#
+                margin-bottom-md
+            ]
+        }
+    )
+
+    region recent (
+        name: Recently Changed
+        title: Recently changed handlers
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    l_html  varchar2(32767);
+                    l_count pls_integer := 0;
+                begin
+                    l_html := '<table class="rst-table"><thead><tr><th>Handler</th><th>Module</th><th>Changed</th></tr></thead><tbody>';
+                    for h in ( select h.id, h.method, t.uri_template, m.name, m.uri_prefix, h.updated_on, h.updated_by
+                                 from user_ords_handlers h
+                                 join user_ords_templates t on t.id = h.template_id
+                                 join user_ords_modules m on m.id = t.module_id
+                                order by h.updated_on desc nulls last, h.id desc
+                                fetch first 8 rows only )
+                    loop
+                        l_count := l_count + 1;
+                        l_html  := l_html
+                            || '<tr><td><a class="rst-method rst-method--' || lower(apex_escape.html_attribute(h.method)) || '" href="'
+                            || apex_page.get_url(p_page => 13, p_items => 'P13_ID', p_values => h.id) || '">' || apex_escape.html(h.method) || '</a> '
+                            || '<a class="rst-path" href="' || apex_page.get_url(p_page => 13, p_items => 'P13_ID', p_values => h.id) || '">'
+                            || apex_escape.html(h.uri_prefix || h.uri_template) || '</a></td>'
+                            || '<td>' || apex_escape.html(h.name) || '</td>'
+                            || '<td>' || apex_escape.html(apex_util.get_since(h.updated_on)) || '</td></tr>';
+                    end loop;
+                    l_html := l_html || '</tbody></table>';
+                    if l_count = 0 then
+                        l_html := l_html || '<div class="rst-empty"><span class="fa fa-cubes" aria-hidden="true"></span>'
+                            || '<p>No services yet.</p><p class="rst-muted">Create a module or import an export file to get started.</p></div>';
+                    end if;
+                    return l_html;
+                end;
+                ```
+        }
+        layout {
+            sequence: 40
+            slot: body
+            columnSpan: 8
+        }
+        appearance {
+            template: @/standard
+            templateOptions: [
+                #DEFAULT#
+                t-Region--noPadding
+                t-Region--scrollBody
+            ]
+        }
+    )
+
+    region endpoint (
+        name: Endpoint
+        title: Service endpoint
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    l_html varchar2(32767);
+                begin
+                    if :G_REST_BASE is not null then
+                        l_html := '<div class="rst-url"><span class="rst-url-text" id="rst-base-url">' || apex_escape.html(:G_REST_BASE || '/') || '</span>'
+                            || '<button type="button" class="rst-copy" data-copy-from="#rst-base-url" title="Copy URL" aria-label="Copy URL">'
+                            || '<span class="fa fa-copy" aria-hidden="true"></span></button></div>'
+                            || '<p class="rst-muted" style="margin-top:.75rem">Every module is published below this URL, followed by the base path of the module.</p>';
+                    else
+                        l_html := '<p class="rst-muted">The schema is not REST enabled.</p>';
+                    end if;
+                    return l_html
+                        || '<dl class="rst-kv" style="margin-top:1rem">'
+                        || '<dt>ORDS version</dt><dd>' || apex_escape.html(ords.installed_version) || '</dd>'
+                        || '<dt>Application</dt><dd>RESTaurant ' || apex_escape.html(v('APP_VERSION')) || '</dd></dl>';
+                end;
+                ```
+        }
+        layout {
+            sequence: 50
+            slot: body
+            startNewRow: false
+        }
+        appearance {
+            template: @/standard
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    pageItem P1_SCHEMA (
+        type: hidden
+        layout {
+            sequence: 10
+            region: @heading
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: restricted
+        }
+    )
+
+    pageItem P1_SCHEMA_URL (
+        type: hidden
+        layout {
+            sequence: 20
+            region: @heading
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: restricted
+        }
+    )
+
+    button create (
+        buttonName: CREATE
+        label: Create Module
+        layout {
+            sequence: 10
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            hot: true
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-plus
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 11
+                clearCache: 11
+            }
+        }
+    )
+
+    button export (
+        buttonName: EXPORT
+        label: Export
+        layout {
+            sequence: 20
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-download
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 60
+                clearCache: 60
+            }
+        }
+    )
+
+    button import (
+        buttonName: IMPORT
+        label: Import
+        layout {
+            sequence: 30
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-upload
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 70
+                clearCache: 70
+            }
+        }
+    )
+
+    process prepare (
+        name: Prepare
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                :P1_SCHEMA     := sys_context('userenv', 'current_schema');
+                :P1_SCHEMA_URL := apex_page.get_url(p_page => 80);
+                ```
+        }
+        execution {
+            sequence: 10
+            point: beforeHeader
+        }
+        advanced {
+            executionMappingIdentifier: 101
+        }
+    )
+
+)

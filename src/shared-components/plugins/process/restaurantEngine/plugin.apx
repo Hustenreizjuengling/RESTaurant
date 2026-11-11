@@ -1,0 +1,51 @@
+plugin restaurantEngine (
+    name: RESTaurant Engine
+    staticId: RESTAURANT.ENGINE
+    type: process
+    component {
+        supports: pageProcesses
+    }
+    source {
+        plsqlCode:
+            ```plsql
+            --------------------------------------------------------------------------------
+            -- Runs the RESTaurant engine.
+            --
+            -- The engine is one anonymous PL/SQL block that is shipped as the static
+            -- application file "engine/restaurant-engine.sql". Keeping it there means
+            -- that the application needs no packages in the database. This plug-in
+            -- loads the block and executes it with the action of the page process.
+            --------------------------------------------------------------------------------
+            procedure run (
+                p_process in            apex_plugin.t_process,
+                p_plugin  in            apex_plugin.t_plugin,
+                p_result  in out nocopy apex_plugin.t_process_exec_result )
+            is
+                c_file constant varchar2(60) := 'engine/restaurant-engine.sql';
+                l_content blob;
+                l_message varchar2(32767);
+            begin
+                begin
+                    select file_content
+                      into l_content
+                      from apex_application_static_files
+                     where application_id = apex_application.g_flow_id
+                       and file_name      = c_file;
+                exception
+                    when no_data_found then
+                        raise_application_error(-20998, 'The static application file ' || c_file || ' is missing.');
+                end;
+
+                execute immediate apex_util.blob_to_clob(l_content, 'AL32UTF8')
+                    using in  p_process.attributes.get_varchar2('action'),
+                          in  p_process.attributes.get_varchar2('itemPrefix'),
+                          out l_message;
+
+                p_result.success_message := nvl(l_message, p_process.success_message);
+            end run;
+            ```
+    }
+    callbacks {
+        executionFunctionProcedureName: run
+    }
+)

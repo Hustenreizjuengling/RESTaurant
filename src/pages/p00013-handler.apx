@@ -1,0 +1,822 @@
+page 13 (
+    name: Handler
+    alias: HANDLER
+    title: Handler
+    pageGroup: @services
+    appearance {
+        pageTemplate: @/left-side-column
+        templateOptions: #DEFAULT#
+    }
+    navigation {
+        cursorFocus: doNotFocusCursor
+    }
+    javaScript {
+        executeWhenPageLoads:
+            ```javascript
+            (function () {
+                var method = apex.item("P13_METHOD"),
+                    type = apex.item("P13_SOURCE_TYPE");
+
+                function isCode(value) {
+                    return value === "plsql/block" || value === "mle/javascript";
+                }
+
+                // only GET handlers can be queries, everything else is code
+                function sync() {
+                    var get = method.getValue() === "GET";
+                    apex.jQuery("#P13_SOURCE_TYPE option").each(function () {
+                        this.disabled = !get && !isCode(this.value);
+                        this.hidden = this.disabled;
+                    });
+                    if (!get && !isCode(type.getValue())) {
+                        type.setValue("plsql/block");
+                    }
+                    apex.item("P13_ITEMS_PER_PAGE")[get ? "show" : "hide"]();
+                    apex.item("P13_MIMES_ALLOWED")[method.getValue() === "POST" || method.getValue() === "PUT" ? "show" : "hide"]();
+                    apex.item("P13_MLE_ENV_NAME")[type.getValue() === "mle/javascript" ? "show" : "hide"]();
+                }
+
+                apex.jQuery("#P13_METHOD, #P13_SOURCE_TYPE").on("change", sync);
+                sync();
+            })();
+            ```
+    }
+    help {
+        helpText: A resource handler answers one HTTP method of a template. GET handlers are usually queries, all other methods run PL/SQL.
+    }
+
+    region heading (
+        name: Heading
+        title: &P13_TITLE.
+        type: staticContent
+        source {
+            htmlCode: Resource handler of <a href="&P13_TEMPLATE_URL!ATTR.">&P13_TEMPLATE_NAME.</a> in module <a href="&P13_MODULE_URL!ATTR.">&P13_MODULE_NAME.</a>
+        }
+        layout {
+            sequence: 10
+            slot: breadcrumbBar
+        }
+        appearance {
+            template: @/hero
+            templateOptions: #DEFAULT#
+            icon: fa-bolt
+        }
+    )
+
+    region service-tree (
+        name: Service Tree
+        type: plugin/restaurantTree
+        layout {
+            sequence: 10
+            slot: leftColumn
+        }
+        appearance {
+            template: @/blank-with-attributes
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region handler (
+        name: Handler
+        title: Definition
+        type: staticContent
+        layout {
+            sequence: 20
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region source (
+        name: Source
+        type: staticContent
+        layout {
+            sequence: 30
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region source-help (
+        name: Bind Variables
+        title: Bind variables you can use
+        type: staticContent
+        source {
+            htmlCode:
+                ```html
+                <p>Path parameters of the URI template and the parameters below are available as bind variables. ORDS adds these implicit ones:</p>
+                <dl class="rst-kv">
+                    <dt><span class="rst-mono">:body</span>, <span class="rst-mono">:body_text</span></dt><dd>Request body as BLOB or CLOB. Read only one of them, and only once.</dd>
+                    <dt><span class="rst-mono">:content_type</span></dt><dd>Content type of the request.</dd>
+                    <dt><span class="rst-mono">:current_user</span></dt><dd>Authenticated user, if any.</dd>
+                    <dt><span class="rst-mono">:status_code</span></dt><dd>Set the HTTP status code of the response.</dd>
+                    <dt><span class="rst-mono">:forward_location</span></dt><dd>Location of a resource that ORDS returns as the response.</dd>
+                    <dt><span class="rst-mono">:fetch_offset</span>, <span class="rst-mono">:fetch_size</span></dt><dd>Paging window for queries that page on their own.</dd>
+                    <dt><span class="rst-mono">:row_offset</span>, <span class="rst-mono">:row_count</span></dt><dd>First and last row of the requested page.</dd>
+                    <dt><span class="rst-mono">:page_offset</span>, <span class="rst-mono">:page_size</span></dt><dd>Zero based offset and size of the requested page.</dd>
+                </dl>
+                ```
+        }
+        layout {
+            sequence: 10
+            parentRegion: @source
+            slot: subRegions
+        }
+        appearance {
+            template: @/collapsible
+            templateOptions: [
+                #DEFAULT#
+                is-collapsed
+                t-Region--scrollBody
+                t-Region--noBorder
+            ]
+        }
+    )
+
+    region parameters (
+        name: Parameters
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    l_html  varchar2(32767);
+                    l_count pls_integer := 0;
+                begin
+                    l_html := '<table class="rst-table"><thead><tr><th>Name</th><th>Bind variable</th><th>Access</th><th>Source</th><th>Data type</th><th>Comments</th></tr></thead><tbody>';
+                    for p in ( select id, name, bind_variable_name, access_method, source_type, param_type, comments
+                                 from user_ords_parameters
+                                where handler_id = :P13_ID
+                                order by name )
+                    loop
+                        l_count := l_count + 1;
+                        l_html  := l_html
+                            || '<tr><td><a class="rst-strong" href="' || apex_page.get_url(p_page => 14, p_items => 'P14_ID', p_values => p.id, p_clear_cache => '14') || '">'
+                            || apex_escape.html(p.name) || '</a></td>'
+                            || '<td><span class="rst-mono">' || case when p.bind_variable_name is not null then ':' || apex_escape.html(p.bind_variable_name) end || '</span></td>'
+                            || '<td>' || apex_escape.html(p.access_method) || '</td>'
+                            || '<td>' || apex_escape.html(case p.source_type when 'HEADER' then 'HTTP header' when 'URI' then 'URI' when 'RESPONSE' then 'Response body' else p.source_type end) || '</td>'
+                            || '<td>' || apex_escape.html(p.param_type) || '</td>'
+                            || '<td><span class="rst-muted">' || apex_escape.html(p.comments) || '</span></td></tr>';
+                    end loop;
+                    l_html := l_html || '</tbody></table>';
+                    if l_count = 0 then
+                        l_html := l_html || '<div class="rst-empty"><p class="rst-muted">No parameters. Path parameters of the URI template do not need to be declared.</p></div>';
+                    end if;
+                    return l_html;
+                end;
+                ```
+        }
+        layout {
+            sequence: 40
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: [
+                #DEFAULT#
+                t-Region--noPadding
+                t-Region--scrollBody
+            ]
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P13_ID
+        }
+    )
+
+    region console (
+        name: Console
+        title: Try it
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    l_method varchar2(10);
+                    l_url    varchar2(4000);
+                begin
+                    select max(h.method), max(:G_REST_BASE || m.uri_prefix || t.uri_template)
+                      into l_method, l_url
+                      from user_ords_handlers h
+                      join user_ords_templates t on t.id = h.template_id
+                      join user_ords_modules m on m.id = t.module_id
+                     where h.id = :P13_ID;
+                    return '<div class="rst-try" data-method="' || apex_escape.html_attribute(l_method) || '">'
+                        || '<div class="rst-try-bar"><span class="rst-method rst-method--lg rst-method--' || lower(apex_escape.html_attribute(l_method)) || '">' || apex_escape.html(l_method) || '</span>'
+                        || '<input type="text" class="rst-try-url" aria-label="Request URL" value="' || apex_escape.html_attribute(l_url) || '">'
+                        || '<button type="button" class="t-Button t-Button--hot rst-try-send">Send</button>'
+                        || '<button type="button" class="t-Button rst-try-curl" title="Copy the request as a cURL command">Copy cURL</button></div>'
+                        || '<div class="rst-try-grid"><div><label for="rst-try-headers">Request headers, one per line</label>'
+                        || '<textarea id="rst-try-headers" class="rst-try-headers" rows="3" placeholder="Authorization: Bearer ..."></textarea></div>'
+                        || case when l_method in ('POST', 'PUT') then
+                               '<div><label for="rst-try-body">Request body</label>'
+                               || '<textarea id="rst-try-body" class="rst-try-body" rows="3" placeholder="{ }"></textarea></div>'
+                           end
+                        || '</div><div class="rst-try-result"><div class="rst-try-meta"><span class="rst-try-code"></span><span class="rst-try-info rst-muted"></span></div>'
+                        || '<details><summary class="rst-muted">Response headers</summary><pre class="rst-preview rst-try-response-headers"></pre></details>'
+                        || '<pre class="rst-preview rst-try-output"></pre></div>'
+                        || '<p class="rst-muted">The request is sent by your browser to the saved handler, without the cookies of this session. Replace path parameters such as <span class="rst-mono">:id</span> in the URL first.</p></div>';
+                end;
+                ```
+        }
+        layout {
+            sequence: 50
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: #DEFAULT#
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P13_ID
+        }
+    )
+
+    pageItem P13_ID (
+        type: hidden
+        layout {
+            sequence: 10
+            region: @handler
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P13_TEMPLATE_ID (
+        type: hidden
+        layout {
+            sequence: 20
+            region: @handler
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P13_MODULE_ID (
+        type: hidden
+        layout {
+            sequence: 30
+            region: @handler
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: restricted
+        }
+    )
+
+    pageItem P13_TITLE (
+        type: hidden
+        layout {
+            sequence: 40
+            region: @handler
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: restricted
+        }
+    )
+
+    pageItem P13_TEMPLATE_NAME (
+        type: hidden
+        layout {
+            sequence: 50
+            region: @handler
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: restricted
+        }
+    )
+
+    pageItem P13_TEMPLATE_URL (
+        type: hidden
+        layout {
+            sequence: 60
+            region: @handler
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: restricted
+        }
+    )
+
+    pageItem P13_MODULE_NAME (
+        type: hidden
+        layout {
+            sequence: 70
+            region: @handler
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: restricted
+        }
+    )
+
+    pageItem P13_MODULE_URL (
+        type: hidden
+        layout {
+            sequence: 80
+            region: @handler
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: restricted
+        }
+    )
+
+    pageItem P13_METHOD (
+        type: selectList
+        label {
+            label: Method
+        }
+        lov {
+            type: staticValues
+            staticValues: STATIC2:GET;GET,POST;POST,PUT;PUT,DELETE;DELETE
+            displayNullValue: false
+        }
+        layout {
+            sequence: 90
+            region: @handler
+            slot: regionBody
+            columnSpan: 3
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            valueRequired: true
+        }
+        help {
+            helpText: The HTTP method this handler answers. A template can have one handler per method.
+        }
+    )
+
+    pageItem P13_SOURCE_TYPE (
+        type: selectList
+        label {
+            label: Source Type
+        }
+        lov {
+            type: staticValues
+            staticValues: STATIC2:Collection Query;json/collection,Collection Query Item;json/item,PL/SQL;plsql/block,Media Resource;resource/lob,MLE JavaScript;mle/javascript,Query (legacy);json/query,Query as CSV (legacy);csv/query,Query One Row (legacy);json/query\;type=single,Feed (legacy);json/query\;type=feed
+            displayNullValue: false
+        }
+        layout {
+            sequence: 100
+            region: @handler
+            slot: regionBody
+            startNewRow: false
+            columnSpan: 4
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            valueRequired: true
+        }
+        default {
+            type: static
+            staticValue: json/collection
+        }
+        help {
+            helpText:
+                ```html
+                <p><strong>Collection Query</strong> returns the rows of a query as a paged JSON collection, <strong>Collection Query Item</strong> a single row as one JSON object.</p>
+                <p><strong>PL/SQL</strong> runs an anonymous block. OUT parameters become the response.</p>
+                <p><strong>Media Resource</strong> expects a query that returns a content type and a LOB and sends the LOB as the response.</p>
+                <p><strong>MLE JavaScript</strong> runs a JavaScript function in the database.</p>
+                ```
+        }
+    )
+
+    pageItem P13_ITEMS_PER_PAGE (
+        type: numberField
+        label {
+            label: Pagination Size
+        }
+        layout {
+            sequence: 110
+            region: @handler
+            slot: regionBody
+            startNewRow: false
+            columnSpan: 2
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        help {
+            helpText: Number of rows per page. Leave empty to use the pagination size of the module.
+        }
+    )
+
+    pageItem P13_MIMES_ALLOWED (
+        type: textField
+        label {
+            label: MIME Types Allowed
+        }
+        layout {
+            sequence: 120
+            region: @handler
+            slot: regionBody
+            startNewRow: false
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+            valuePlaceholder: application/json
+        }
+        validation {
+            maxLength: 255
+        }
+        help {
+            helpText: Comma separated list of content types the handler accepts. Leave empty to accept any.
+        }
+    )
+
+    pageItem P13_MLE_ENV_NAME (
+        type: textField
+        label {
+            label: MLE Environment
+        }
+        layout {
+            sequence: 130
+            region: @handler
+            slot: regionBody
+            columnSpan: 4
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            maxLength: 255
+        }
+        help {
+            helpText: Name of the MLE environment that is available to the JavaScript handler.
+        }
+    )
+
+    pageItem P13_COMMENTS (
+        type: textField
+        label {
+            label: Comments
+        }
+        layout {
+            sequence: 140
+            region: @handler
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            maxLength: 4000
+        }
+    )
+
+    pageItem P13_SOURCE (
+        type: textarea
+        label {
+            label: Source
+        }
+        settings {
+            resizable: true
+            trimSpaces: none
+        }
+        layout {
+            sequence: 10
+            region: @source
+            slot: regionBody
+        }
+        appearance {
+            template: @/hidden
+            templateOptions: [
+                #DEFAULT#
+                t-Form-fieldContainer--stretchInputs
+            ]
+            cssClasses: rst-code
+            height: 18
+        }
+        sessionState {
+            dataType: clob
+        }
+        help {
+            helpText: The query or code of the handler. Reference parameters as bind variables, for example <strong>:id</strong>.
+        }
+    )
+
+    button create (
+        buttonName: CREATE
+        label: Create Handler
+        layout {
+            sequence: 10
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text
+            hot: true
+            templateOptions: #DEFAULT#
+        }
+        serverSideCondition {
+            type: itemIsNull
+            item: P13_ID
+        }
+    )
+
+    button save (
+        buttonName: SAVE
+        label: Save
+        layout {
+            sequence: 20
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text
+            hot: true
+            templateOptions: #DEFAULT#
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P13_ID
+        }
+    )
+
+    button export (
+        buttonName: EXPORT
+        label: Export
+        layout {
+            sequence: 30
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-download
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 60
+                items: {
+                    P60_SCOPE: HANDLER
+                    P60_ID: &P13_ID.
+                }
+                clearCache: 60
+            }
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P13_ID
+        }
+    )
+
+    button delete (
+        buttonName: DELETE
+        label: Delete
+        layout {
+            sequence: 40
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: [
+                #DEFAULT#
+                t-Button--danger
+                t-Button--simple
+            ]
+        }
+        behavior {
+            executeValidations: false
+            warnOnUnsavedChanges: doNotCheck
+            requiresConfirmation: true
+        }
+        confirmation {
+            message: Delete this handler?
+            style: danger
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P13_ID
+        }
+    )
+
+    button add-parameter (
+        buttonName: ADD_PARAMETER
+        label: Add Parameter
+        layout {
+            sequence: 10
+            region: @parameters
+            slot: edit
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-plus
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 14
+                items: {
+                    P14_HANDLER_ID: &P13_ID.
+                }
+                clearCache: 14
+            }
+        }
+    )
+
+    dynamicAction parameter-dialog-closed (
+        name: Parameter Dialog Closed
+        execution {
+            sequence: 10
+        }
+        when {
+            event: apexafterclosedialog
+            selectionType: region
+            region: @parameters
+        }
+
+        action native-refresh (
+            action: refresh
+            affectedElements {
+                selectionType: region
+                region: @parameters
+            }
+            execution {
+                sequence: 10
+                fireOnInit: false
+            }
+        )
+
+    )
+
+    process load-handler (
+        name: Load Handler
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                declare
+                    l_found boolean := false;
+                begin
+                    for h in ( select template_id, method, source_type, items_per_page, mimes_allowed, mle_env_name, comments, source
+                                 from user_ords_handlers
+                                where id = :P13_ID )
+                    loop
+                        l_found              := true;
+                        :P13_TEMPLATE_ID     := h.template_id;
+                        :P13_METHOD          := h.method;
+                        :P13_SOURCE_TYPE     := h.source_type;
+                        :P13_ITEMS_PER_PAGE  := h.items_per_page;
+                        :P13_MIMES_ALLOWED   := h.mimes_allowed;
+                        :P13_MLE_ENV_NAME    := h.mle_env_name;
+                        :P13_COMMENTS        := h.comments;
+                        apex_session_state.set_value(p_item => 'P13_SOURCE', p_value => h.source);
+                    end loop;
+                    if not l_found then
+                        :P13_ID := null;
+                        -- suggest the first method the template does not answer yet
+                        select min(m.method) keep (dense_rank first order by m.pos)
+                          into :P13_METHOD
+                          from ( select 'GET' method, 1 pos from dual union all
+                                 select 'POST', 2 from dual union all
+                                 select 'PUT', 3 from dual union all
+                                 select 'DELETE', 4 from dual ) m
+                         where not exists ( select null
+                                              from user_ords_handlers h
+                                             where h.template_id = :P13_TEMPLATE_ID
+                                               and h.method = m.method );
+                        :P13_SOURCE_TYPE := case when :P13_METHOD = 'GET' then 'json/collection' else 'plsql/block' end;
+                    end if;
+                    :P13_TEMPLATE_NAME := null;
+                    for t in ( select t.uri_template, t.module_id, m.name
+                                 from user_ords_templates t
+                                 join user_ords_modules m on m.id = t.module_id
+                                where t.id = :P13_TEMPLATE_ID )
+                    loop
+                        :P13_TEMPLATE_NAME := t.uri_template;
+                        :P13_MODULE_ID     := t.module_id;
+                        :P13_MODULE_NAME   := t.name;
+                        :P13_TEMPLATE_URL  := apex_page.get_url(p_page => 12, p_items => 'P12_ID', p_values => :P13_TEMPLATE_ID);
+                        :P13_MODULE_URL    := apex_page.get_url(p_page => 11, p_items => 'P11_ID', p_values => t.module_id);
+                        :P13_TITLE         := case when l_found then :P13_METHOD || ' ' || t.uri_template else 'New Handler' end;
+                    end loop;
+                    if :P13_TEMPLATE_NAME is null then
+                        -- neither the handler nor its template exist any more
+                        apex_util.redirect_url(apex_page.get_url(p_page => 10));
+                    end if;
+                end;
+                ```
+        }
+        execution {
+            sequence: 10
+            point: beforeHeader
+        }
+        advanced {
+            executionMappingIdentifier: 1301
+        }
+    )
+
+    process save-handler (
+        name: Save Handler
+        type: plugin/restaurantEngine
+        settings {
+            action: HANDLER_SAVE
+        }
+        execution {
+            sequence: 10
+        }
+        successMessage {
+            successMessage: Handler saved.
+        }
+        serverSideCondition {
+            type: requestIsContainedInValue
+            value: CREATE,SAVE
+        }
+        advanced {
+            executionMappingIdentifier: 1302
+        }
+    )
+
+    process delete-handler (
+        name: Delete Handler
+        type: plugin/restaurantEngine
+        settings {
+            action: HANDLER_DELETE
+        }
+        execution {
+            sequence: 20
+        }
+        successMessage {
+            successMessage: Handler deleted.
+        }
+        serverSideCondition {
+            type: request=Value
+            value: DELETE
+        }
+        advanced {
+            executionMappingIdentifier: 1303
+        }
+    )
+
+    branch back-to-template (
+        name: Back to Template
+        execution {
+            sequence: 10
+        }
+        behavior {
+            target: {
+                page: 12
+                items: {
+                    P12_ID: &P13_TEMPLATE_ID.
+                }
+            }
+        }
+        serverSideCondition {
+            type: request=Value
+            value: DELETE
+        }
+    )
+
+    branch stay-on-handler (
+        name: Stay on Handler
+        execution {
+            sequence: 20
+        }
+        behavior {
+            target: {
+                page: 13
+                items: {
+                    P13_ID: &P13_ID.
+                }
+            }
+        }
+    )
+
+)

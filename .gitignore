@@ -1,0 +1,9 @@
+# local sandbox overrides
+.env
+
+# editor and OS noise
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

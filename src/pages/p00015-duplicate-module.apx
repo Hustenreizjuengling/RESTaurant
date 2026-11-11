@@ -1,0 +1,263 @@
+page 15 (
+    name: Duplicate Module
+    alias: DUPLICATE-MODULE
+    title: Duplicate Module
+    pageGroup: @services
+    appearance {
+        pageMode: modalDialog
+        dialogTemplate: @/modal-dialog
+        templateOptions: #DEFAULT#
+    }
+    dialog {
+        width: 560
+        chained: false
+    }
+    help {
+        helpText: Creates a copy of a module with all of its templates, handlers and parameters under a new name and base path.
+    }
+
+    region copy (
+        name: Copy
+        type: staticContent
+        source {
+            htmlCode: <p class="rst-muted">All templates, handlers and parameters of <strong>&P15_SOURCE_NAME.</strong> are copied. Privileges are not copied.</p>
+        }
+        layout {
+            sequence: 10
+            slot: contentBody
+        }
+        appearance {
+            template: @/blank-with-attributes
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region buttons (
+        name: Buttons
+        type: staticContent
+        layout {
+            sequence: 20
+            slot: dialogFooter
+        }
+        appearance {
+            template: @/buttons-container
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    pageItem P15_ID (
+        type: hidden
+        layout {
+            sequence: 10
+            region: @copy
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P15_NEW_ID (
+        type: hidden
+        layout {
+            sequence: 20
+            region: @copy
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: restricted
+        }
+    )
+
+    pageItem P15_SOURCE_NAME (
+        type: hidden
+        layout {
+            sequence: 30
+            region: @copy
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: restricted
+        }
+    )
+
+    pageItem P15_NEW_NAME (
+        type: textField
+        label {
+            label: New Module Name
+        }
+        layout {
+            sequence: 40
+            region: @copy
+            slot: regionBody
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            valueRequired: true
+            maxLength: 255
+        }
+    )
+
+    pageItem P15_NEW_BASE_PATH (
+        type: textField
+        label {
+            label: New Base Path
+        }
+        layout {
+            sequence: 50
+            region: @copy
+            slot: regionBody
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+            cssClasses: rst-mono
+        }
+        validation {
+            valueRequired: true
+            maxLength: 255
+        }
+    )
+
+    pageItem P15_NEW_STATUS (
+        type: switch
+        label {
+            label: Publish the copy
+        }
+        settings {
+            useDefaults: false
+            onValue: PUBLISHED
+            onLabel: Published
+            offValue: NOT_PUBLISHED
+            offLabel: Not published
+        }
+        layout {
+            sequence: 60
+            region: @copy
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        default {
+            type: static
+            staticValue: NOT_PUBLISHED
+        }
+    )
+
+    button cancel (
+        buttonName: CANCEL
+        label: Cancel
+        layout {
+            sequence: 10
+            region: @buttons
+            slot: close
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: #DEFAULT#
+        }
+        behavior {
+            action: definedByDynamicAction
+        }
+    )
+
+    button duplicate (
+        buttonName: DUPLICATE
+        label: Duplicate
+        layout {
+            sequence: 20
+            region: @buttons
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text
+            hot: true
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    dynamicAction cancel-dialog (
+        name: Cancel Dialog
+        execution {
+            sequence: 10
+        }
+        when {
+            event: click
+            selectionType: button
+            button: @cancel
+        }
+
+        action native-dialog-cancel (
+            action: cancelDialog
+            execution {
+                sequence: 10
+                fireOnInit: false
+            }
+        )
+
+    )
+
+    process suggest-names (
+        name: Suggest Names
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                for m in ( select name, uri_prefix from user_ords_modules where id = :P15_ID ) loop
+                    :P15_SOURCE_NAME   := m.name;
+                    :P15_NEW_NAME      := m.name || '.copy';
+                    :P15_NEW_BASE_PATH := rtrim(m.uri_prefix, '/') || '-copy/';
+                end loop;
+                ```
+        }
+        execution {
+            sequence: 10
+            point: beforeHeader
+        }
+        serverSideCondition {
+            type: itemIsNull
+            item: P15_NEW_NAME
+        }
+        advanced {
+            executionMappingIdentifier: 1501
+        }
+    )
+
+    process duplicate-module (
+        name: Duplicate Module
+        type: plugin/restaurantEngine
+        settings {
+            action: MODULE_COPY
+        }
+        execution {
+            sequence: 10
+        }
+        successMessage {
+            successMessage: Module duplicated.
+        }
+        advanced {
+            executionMappingIdentifier: 1502
+        }
+    )
+
+    branch open-copy (
+        name: Open the Copy
+        execution {
+            sequence: 10
+        }
+        behavior {
+            target: {
+                page: 11
+                items: {
+                    P11_ID: &P15_NEW_ID.
+                }
+            }
+        }
+    )
+
+)

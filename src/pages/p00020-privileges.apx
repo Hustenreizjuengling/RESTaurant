@@ -1,0 +1,162 @@
+page 20 (
+    name: Privileges
+    alias: PRIVILEGES
+    title: Privileges
+    pageGroup: @security
+    appearance {
+        pageTemplate: @/standard
+        templateOptions: #DEFAULT#
+    }
+    navigation {
+        cursorFocus: doNotFocusCursor
+    }
+    help {
+        helpText: A privilege protects modules and URL patterns. A caller needs at least one of the roles of the privilege. A privilege without roles only requires an authenticated user.
+    }
+
+    region heading (
+        name: Heading
+        title: Privileges
+        type: staticContent
+        source {
+            htmlCode: Privileges protect modules and URL patterns and name the roles that may call them.
+        }
+        layout {
+            sequence: 10
+            slot: breadcrumbBar
+        }
+        appearance {
+            template: @/hero
+            templateOptions: #DEFAULT#
+            icon: fa-shield
+        }
+    )
+
+    region privileges (
+        name: Privileges
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    l_html      clob;
+                    l_buffer    varchar2(32767);
+                    l_count     pls_integer := 0;
+                    l_schema_id number;
+
+                    procedure p (p_text in varchar2) is
+                    begin
+                        if nvl(lengthb(l_buffer), 0) + nvl(lengthb(p_text), 0) > 32000 then
+                            dbms_lob.writeappend(l_html, length(l_buffer), l_buffer);
+                            l_buffer := null;
+                        end if;
+                        l_buffer := l_buffer || p_text;
+                    end p;
+                begin
+                    dbms_lob.createtemporary(l_html, true);
+                    select max(id) into l_schema_id from user_ords_schemas;
+                    p('<div class="rst-toolbar"><input type="search" class="rst-filter" data-target="#rst-privileges" placeholder="Filter privileges" aria-label="Filter privileges"></div>');
+                    p('<table class="rst-table" id="rst-privileges"><thead><tr><th>Privilege</th><th>Roles</th><th>Protected modules</th><th>Protected patterns</th><th>Changed</th></tr></thead><tbody>');
+                    for v in ( select id, name, label, description, updated_on, updated_by
+                                 from user_ords_privileges
+                                where schema_id = l_schema_id
+                                  and name not like 'oracle.%'
+                                order by name )
+                    loop
+                        l_count := l_count + 1;
+                        p('<tr><td><a class="rst-strong" href="' || apex_page.get_url(p_page => 21, p_items => 'P21_ID', p_values => v.id, p_clear_cache => '21') || '">'
+                          || apex_escape.html(v.name) || '</a>'
+                          || case when v.label is not null then '<div class="rst-muted">' || apex_escape.html(v.label) || '</div>' end
+                          || '</td><td><div class="rst-chips">');
+                        for r in ( select role_name from user_ords_privilege_roles where privilege_id = v.id order by role_name ) loop
+                            p('<span class="rst-chip">' || apex_escape.html(r.role_name) || '</span>');
+                        end loop;
+                        p('</div></td><td><div class="rst-chips">');
+                        for m in ( select module_name from user_ords_privilege_modules where privilege_id = v.id order by module_name ) loop
+                            p('<span class="rst-chip">' || apex_escape.html(m.module_name) || '</span>');
+                        end loop;
+                        p('</div></td><td>');
+                        for m in ( select pattern from user_ords_privilege_mappings where privilege_id = v.id order by pattern ) loop
+                            p('<div class="rst-path">' || apex_escape.html(m.pattern) || '</div>');
+                        end loop;
+                        p('</td><td><span title="' || apex_escape.html_attribute(v.updated_by) || '">' || apex_escape.html(apex_util.get_since(v.updated_on)) || '</span></td></tr>');
+                    end loop;
+                    p('</tbody></table>');
+                    if l_count = 0 then
+                        p('<div class="rst-empty"><span class="fa fa-shield" aria-hidden="true"></span>'
+                          || '<p>No privileges defined.</p><p class="rst-muted">Without a privilege every module of the schema is public.</p></div>');
+                    end if;
+                    if l_buffer is not null then
+                        dbms_lob.writeappend(l_html, length(l_buffer), l_buffer);
+                    end if;
+                    return l_html;
+                end;
+                ```
+        }
+        layout {
+            sequence: 20
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: [
+                #DEFAULT#
+                t-Region--noPadding
+                t-Region--hideHeader js-addHiddenHeadingRoleDesc
+                t-Region--scrollBody
+            ]
+        }
+    )
+
+    button create (
+        buttonName: CREATE
+        label: Create Privilege
+        layout {
+            sequence: 10
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            hot: true
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-plus
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 21
+                clearCache: 21
+            }
+        }
+    )
+
+    dynamicAction dialog-closed (
+        name: Dialog Closed
+        execution {
+            sequence: 10
+        }
+        when {
+            event: apexafterclosedialog
+            selectionType: jsExpression
+            javaScriptExpression: document
+        }
+
+        action native-refresh (
+            action: refresh
+            affectedElements {
+                selectionType: region
+                region: @privileges
+            }
+            execution {
+                sequence: 10
+                fireOnInit: false
+            }
+        )
+
+    )
+
+)

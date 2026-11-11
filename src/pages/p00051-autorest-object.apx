@@ -1,0 +1,351 @@
+page 51 (
+    name: AutoREST Object
+    alias: AUTOREST-OBJECT
+    title: AutoREST Object
+    pageGroup: @services
+    appearance {
+        pageMode: modalDialog
+        dialogTemplate: @/modal-dialog
+        templateOptions: #DEFAULT#
+    }
+    dialog {
+        width: 600
+        chained: false
+    }
+    help {
+        helpText: Publishes a database object through AutoREST. The alias is the path of the object below the URL of the schema.
+    }
+
+    region object (
+        name: Object
+        type: staticContent
+        layout {
+            sequence: 10
+            slot: contentBody
+        }
+        appearance {
+            template: @/blank-with-attributes
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region buttons (
+        name: Buttons
+        type: staticContent
+        layout {
+            sequence: 20
+            slot: dialogFooter
+        }
+        appearance {
+            template: @/buttons-container
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    pageItem P51_ID (
+        type: hidden
+        layout {
+            sequence: 10
+            region: @object
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P51_OBJECT (
+        type: selectList
+        label {
+            label: Database Object
+        }
+        lov {
+            type: sqlQuery
+            sqlQuery:
+                ```sql
+                select object_name || ' (' || lower(object_type) || ')' d,
+                       object_type || ':' || object_name r
+                  from user_objects
+                 where object_type in ('TABLE', 'VIEW', 'PACKAGE', 'PROCEDURE', 'FUNCTION')
+                   and object_name not like 'BIN$%'
+                   and ( :P51_ID is not null
+                         or object_name not in ( select parsing_object from user_ords_enabled_objects ) )
+                 order by object_type desc, object_name
+                ```
+            displayNullValue: true
+            nullDisplayValue: - Select an object -
+        }
+        layout {
+            sequence: 20
+            region: @object
+            slot: regionBody
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            valueRequired: true
+        }
+        readOnly {
+            type: itemIsNotNull
+            item: P51_ID
+        }
+    )
+
+    pageItem P51_ALIAS (
+        type: textField
+        label {
+            label: Alias
+        }
+        layout {
+            sequence: 30
+            region: @object
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+            cssClasses: rst-mono
+        }
+        validation {
+            maxLength: 255
+        }
+        help {
+            helpText: Path of the object in the URL. Leave empty to use the name of the object in lower case.
+        }
+    )
+
+    pageItem P51_ENABLED (
+        type: switch
+        label {
+            label: Enabled
+        }
+        settings {
+            useDefaults: false
+            onValue: Y
+            onLabel: Enabled
+            offValue: N
+            offLabel: Disabled
+        }
+        layout {
+            sequence: 40
+            region: @object
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        default {
+            type: static
+            staticValue: Y
+        }
+    )
+
+    pageItem P51_AUTH (
+        type: switch
+        label {
+            label: Authorization required
+        }
+        settings {
+            useDefaults: false
+            onValue: Y
+            onLabel: Required
+            offValue: N
+            offLabel: Public
+        }
+        layout {
+            sequence: 50
+            region: @object
+            slot: regionBody
+            startNewRow: false
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        default {
+            type: static
+            staticValue: Y
+        }
+        help {
+            helpText: When required, callers need the role <strong>oracle.dbtools.role.autorest.SCHEMA.OBJECT</strong> or the privilege of the same kind. Public objects can be read and changed by anyone who can reach ORDS.
+        }
+    )
+
+    button cancel (
+        buttonName: CANCEL
+        label: Cancel
+        layout {
+            sequence: 10
+            region: @buttons
+            slot: close
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: #DEFAULT#
+        }
+        behavior {
+            action: definedByDynamicAction
+        }
+    )
+
+    button delete (
+        buttonName: DELETE
+        label: Remove
+        layout {
+            sequence: 20
+            region: @buttons
+            slot: delete
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: [
+                #DEFAULT#
+                t-Button--danger
+                t-Button--simple
+            ]
+        }
+        behavior {
+            executeValidations: false
+            warnOnUnsavedChanges: doNotCheck
+            requiresConfirmation: true
+        }
+        confirmation {
+            message: Remove the REST definition of this object? The object itself is not changed.
+            style: danger
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P51_ID
+        }
+    )
+
+    button save (
+        buttonName: SAVE
+        label: Save
+        layout {
+            sequence: 30
+            region: @buttons
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text
+            hot: true
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    dynamicAction cancel-dialog (
+        name: Cancel Dialog
+        execution {
+            sequence: 10
+        }
+        when {
+            event: click
+            selectionType: button
+            button: @cancel
+        }
+
+        action native-dialog-cancel (
+            action: cancelDialog
+            execution {
+                sequence: 10
+                fireOnInit: false
+            }
+        )
+
+    )
+
+    process load-object (
+        name: Load Object
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                for o in ( select parsing_object, object_alias, type, status, auto_rest_auth
+                             from user_ords_enabled_objects
+                            where id = :P51_ID )
+                loop
+                    :P51_OBJECT  := o.type || ':' || o.parsing_object;
+                    :P51_ALIAS   := o.object_alias;
+                    :P51_ENABLED := case o.status when 'ENABLED' then 'Y' else 'N' end;
+                    :P51_AUTH    := case o.auto_rest_auth when 'ENABLED' then 'Y' else 'N' end;
+                end loop;
+                ```
+        }
+        execution {
+            sequence: 10
+            point: beforeHeader
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P51_ID
+        }
+        advanced {
+            executionMappingIdentifier: 5101
+        }
+    )
+
+    process save-object (
+        name: Save Object
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                ords.enable_object(
+                    p_enabled        => :P51_ENABLED = 'Y',
+                    p_object         => substr(:P51_OBJECT, instr(:P51_OBJECT, ':') + 1),
+                    p_object_type    => substr(:P51_OBJECT, 1, instr(:P51_OBJECT, ':') - 1),
+                    p_object_alias   => trim(:P51_ALIAS),
+                    p_auto_rest_auth => :P51_AUTH = 'Y' );
+                ```
+        }
+        execution {
+            sequence: 10
+        }
+        serverSideCondition {
+            type: request=Value
+            value: SAVE
+        }
+        advanced {
+            executionMappingIdentifier: 5102
+        }
+    )
+
+    process delete-object (
+        name: Remove Object
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                for o in ( select parsing_object from user_ords_enabled_objects where id = :P51_ID ) loop
+                    ords.drop_rest_for_object(p_object => o.parsing_object);
+                end loop;
+                ```
+        }
+        execution {
+            sequence: 20
+        }
+        serverSideCondition {
+            type: request=Value
+            value: DELETE
+        }
+        advanced {
+            executionMappingIdentifier: 5103
+        }
+    )
+
+    process close-dialog (
+        name: Close Dialog
+        type: closeDialog
+        execution {
+            sequence: 30
+        }
+        advanced {
+            executionMappingIdentifier: 5104
+        }
+    )
+
+)

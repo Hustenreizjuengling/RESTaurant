@@ -1,0 +1,87 @@
+plugin restaurantTree (
+    name: RESTaurant Service Tree
+    staticId: RESTAURANT.TREE
+    type: region
+    source {
+        plsqlCode:
+            ```plsql
+            --------------------------------------------------------------------------------
+            -- Navigation tree of the module editor: modules, their templates and one chip
+            -- per handler. The node of the current page is marked, so that the script in
+            -- restaurant.js can open and highlight it.
+            --------------------------------------------------------------------------------
+            procedure render (
+                p_plugin in            apex_plugin.t_plugin,
+                p_region in            apex_plugin.t_region,
+                p_param  in            apex_plugin.t_region_render_param,
+                p_result in out nocopy apex_plugin.t_region_render_result )
+            is
+                l_page     number := apex_application.g_flow_step_id;
+                l_module   number := case l_page when 11 then v('P11_ID') when 12 then v('P12_MODULE_ID') when 13 then v('P13_MODULE_ID') end;
+                l_template number := case l_page when 12 then v('P12_ID') when 13 then v('P13_TEMPLATE_ID') end;
+                l_handler  number := case l_page when 13 then v('P13_ID') end;
+                l_count    pls_integer := 0;
+
+                procedure p (p_text in varchar2) is
+                begin
+                    sys.htp.prn(p_text);
+                end p;
+            begin
+                p('<div class="rst-tree">');
+                p('<div class="rst-tree-tools">');
+                p('<input type="search" class="rst-tree-search" placeholder="Filter services" aria-label="Filter services">');
+                p('<a class="rst-tree-add" title="Create module" aria-label="Create module" href="'
+                  || apex_page.get_url(p_page => 11, p_clear_cache => '11') || '"><span class="fa fa-plus" aria-hidden="true"></span></a>');
+                p('</div><ul class="rst-tree-list">');
+                for m in ( select id, name, status
+                             from user_ords_modules
+                            order by name )
+                loop
+                    l_count := l_count + 1;
+                    p('<li class="rst-node rst-node--module'
+                      || case when m.id = l_module then ' is-open' end
+                      || case when m.id = l_module and l_page = 11 then ' is-current' end
+                      || '" data-key="m' || m.id || '"><div class="rst-node-row">'
+                      || '<button type="button" class="rst-node-toggle" aria-label="Expand or collapse"></button>'
+                      || '<a class="rst-node-link" href="' || apex_page.get_url(p_page => 11, p_items => 'P11_ID', p_values => m.id) || '">'
+                      || '<span class="rst-node-icon fa fa-cubes" aria-hidden="true"></span>'
+                      || '<span class="rst-node-label">' || apex_escape.html(m.name) || '</span></a>'
+                      || case when m.status <> 'PUBLISHED' then '<span class="rst-dot" title="Not published"></span>' end
+                      || '</div><ul>');
+                    for t in ( select id, uri_template
+                                 from user_ords_templates
+                                where module_id = m.id
+                                order by uri_template )
+                    loop
+                        p('<li class="rst-node rst-node--template'
+                          || case when t.id = l_template and l_page = 12 then ' is-current' end
+                          || '"><div class="rst-node-row">'
+                          || '<a class="rst-node-link" href="' || apex_page.get_url(p_page => 12, p_items => 'P12_ID', p_values => t.id) || '">'
+                          || '<span class="rst-node-label rst-path">' || apex_escape.html(t.uri_template) || '</span></a>'
+                          || '<span class="rst-node-chips">');
+                        for h in ( select id, method
+                                     from user_ords_handlers
+                                    where template_id = t.id
+                                    order by decode(method, 'GET', 1, 'POST', 2, 'PUT', 3, 'DELETE', 4, 5) )
+                        loop
+                            p('<a class="rst-method rst-method--' || lower(apex_escape.html_attribute(h.method))
+                              || case when h.id = l_handler then ' is-current' end
+                              || '" href="' || apex_page.get_url(p_page => 13, p_items => 'P13_ID', p_values => h.id) || '">'
+                              || apex_escape.html(h.method) || '</a>');
+                        end loop;
+                        p('</span></div></li>');
+                    end loop;
+                    p('</ul></li>');
+                end loop;
+                p('</ul>');
+                if l_count = 0 then
+                    p('<p class="rst-tree-empty">No modules yet.</p>');
+                end if;
+                p('</div>');
+            end render;
+            ```
+    }
+    callbacks {
+        renderProcedureName: render
+    }
+)

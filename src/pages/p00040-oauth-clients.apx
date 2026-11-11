@@ -1,0 +1,161 @@
+page 40 (
+    name: OAuth Clients
+    alias: OAUTH-CLIENTS
+    title: OAuth Clients
+    pageGroup: @security
+    appearance {
+        pageTemplate: @/standard
+        templateOptions: #DEFAULT#
+    }
+    navigation {
+        cursorFocus: doNotFocusCursor
+    }
+    help {
+        helpText: OAuth clients are the applications that call protected services. A client gets an access token from the token endpoint and sends it with every request. Grant the client the roles of the privileges it needs.
+    }
+
+    region heading (
+        name: Heading
+        title: OAuth Clients
+        type: staticContent
+        source {
+            htmlCode: Applications that call protected services with an OAuth 2.0 access token.
+        }
+        layout {
+            sequence: 10
+            slot: breadcrumbBar
+        }
+        appearance {
+            template: @/hero
+            templateOptions: #DEFAULT#
+            icon: fa-key
+        }
+    )
+
+    region clients (
+        name: Clients
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    l_html   clob;
+                    l_buffer varchar2(32767);
+                    l_count  pls_integer := 0;
+
+                    procedure p (p_text in varchar2) is
+                    begin
+                        if nvl(lengthb(l_buffer), 0) + nvl(lengthb(p_text), 0) > 32000 then
+                            dbms_lob.writeappend(l_html, length(l_buffer), l_buffer);
+                            l_buffer := null;
+                        end if;
+                        l_buffer := l_buffer || p_text;
+                    end p;
+                begin
+                    dbms_lob.createtemporary(l_html, true);
+                    p('<div class="rst-toolbar"><input type="search" class="rst-filter" data-target="#rst-clients" placeholder="Filter clients" aria-label="Filter clients"></div>');
+                    p('<table class="rst-table" id="rst-clients"><thead><tr><th>Client</th><th>Grant type</th><th>Client ID</th><th>Roles</th><th>Privileges</th><th>Changed</th></tr></thead><tbody>');
+                    for c in ( select id, name, description, auth_flow, client_id, updated_on, updated_by
+                                 from user_ords_clients
+                                order by name )
+                    loop
+                        l_count := l_count + 1;
+                        p('<tr><td><a class="rst-strong" href="' || apex_page.get_url(p_page => 41, p_items => 'P41_ID', p_values => c.id, p_clear_cache => '41') || '">'
+                          || apex_escape.html(c.name) || '</a>'
+                          || case when c.description is not null then '<div class="rst-muted">' || apex_escape.html(c.description) || '</div>' end
+                          || '</td><td>' || apex_escape.html(
+                                 case c.auth_flow
+                                     when 'CLIENT_CRED' then 'Client credentials'
+                                     when 'AUTH_CODE'   then 'Authorization code'
+                                     when 'IMPLICIT'    then 'Implicit'
+                                     else c.auth_flow
+                                 end )
+                          || '</td><td><span class="rst-mono">' || apex_escape.html(c.client_id) || '</span></td><td><div class="rst-chips">');
+                        for r in ( select role_name from user_ords_client_roles where client_id = c.id order by role_name ) loop
+                            p('<span class="rst-chip">' || apex_escape.html(r.role_name) || '</span>');
+                        end loop;
+                        p('</div></td><td><div class="rst-chips">');
+                        for v in ( select name from user_ords_client_privileges where client_priv_client_id = c.id order by name ) loop
+                            p('<span class="rst-chip">' || apex_escape.html(v.name) || '</span>');
+                        end loop;
+                        p('</div></td><td><span title="' || apex_escape.html_attribute(c.updated_by) || '">' || apex_escape.html(apex_util.get_since(c.updated_on)) || '</span></td></tr>');
+                    end loop;
+                    p('</tbody></table>');
+                    if l_count = 0 then
+                        p('<div class="rst-empty"><span class="fa fa-key" aria-hidden="true"></span>'
+                          || '<p>No OAuth clients registered.</p><p class="rst-muted">Register a client for each application that calls protected services.</p></div>');
+                    end if;
+                    if l_buffer is not null then
+                        dbms_lob.writeappend(l_html, length(l_buffer), l_buffer);
+                    end if;
+                    return l_html;
+                end;
+                ```
+        }
+        layout {
+            sequence: 20
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: [
+                #DEFAULT#
+                t-Region--noPadding
+                t-Region--hideHeader js-addHiddenHeadingRoleDesc
+                t-Region--scrollBody
+            ]
+        }
+    )
+
+    button create (
+        buttonName: CREATE
+        label: Register Client
+        layout {
+            sequence: 10
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            hot: true
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-plus
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 41
+                clearCache: 41
+            }
+        }
+    )
+
+    dynamicAction dialog-closed (
+        name: Dialog Closed
+        execution {
+            sequence: 10
+        }
+        when {
+            event: apexafterclosedialog
+            selectionType: jsExpression
+            javaScriptExpression: document
+        }
+
+        action native-refresh (
+            action: refresh
+            affectedElements {
+                selectionType: region
+                region: @clients
+            }
+            execution {
+                sequence: 10
+                fireOnInit: false
+            }
+        )
+
+    )
+
+)

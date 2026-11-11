@@ -1,0 +1,388 @@
+page 14 (
+    name: Parameter
+    alias: PARAMETER
+    title: Handler Parameter
+    pageGroup: @services
+    appearance {
+        pageMode: modalDialog
+        dialogTemplate: @/modal-dialog
+        templateOptions: #DEFAULT#
+    }
+    dialog {
+        width: 640
+        chained: false
+    }
+    help {
+        helpText: Parameters map HTTP headers, URI values or the response to bind variables of the handler source.
+    }
+
+    region parameter (
+        name: Parameter
+        type: staticContent
+        layout {
+            sequence: 10
+            slot: contentBody
+        }
+        appearance {
+            template: @/blank-with-attributes
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region buttons (
+        name: Buttons
+        type: staticContent
+        layout {
+            sequence: 20
+            slot: dialogFooter
+        }
+        appearance {
+            template: @/buttons-container
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    pageItem P14_ID (
+        type: hidden
+        layout {
+            sequence: 10
+            region: @parameter
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P14_HANDLER_ID (
+        type: hidden
+        layout {
+            sequence: 20
+            region: @parameter
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P14_NAME (
+        type: textField
+        label {
+            label: Name
+        }
+        layout {
+            sequence: 30
+            region: @parameter
+            slot: regionBody
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+            valuePlaceholder: X-Request-Id
+        }
+        validation {
+            valueRequired: true
+            maxLength: 100
+        }
+        help {
+            helpText: Name of the parameter as the client sees it: the name of the HTTP header, of the URI parameter or of the property in the JSON response.
+        }
+    )
+
+    pageItem P14_BIND_VARIABLE_NAME (
+        type: textField
+        label {
+            label: Bind Variable
+        }
+        layout {
+            sequence: 40
+            region: @parameter
+            slot: regionBody
+            startNewRow: false
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+            cssClasses: rst-mono
+            valuePlaceholder: request_id
+        }
+        validation {
+            maxLength: 30
+        }
+        help {
+            helpText: Name of the bind variable in the handler source, without the colon. Each bind variable can be used by one parameter only.
+        }
+    )
+
+    pageItem P14_SOURCE_TYPE (
+        type: selectList
+        label {
+            label: Source Type
+        }
+        lov {
+            type: staticValues
+            staticValues: STATIC2:HTTP header;HEADER,URI;URI,Response body;RESPONSE
+            displayNullValue: false
+        }
+        layout {
+            sequence: 50
+            region: @parameter
+            slot: regionBody
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+        }
+        default {
+            type: static
+            staticValue: HEADER
+        }
+        help {
+            helpText: Where the value comes from or goes to: an HTTP header, the URI (path or query string) or the body of the response.
+        }
+    )
+
+    pageItem P14_ACCESS_METHOD (
+        type: selectList
+        label {
+            label: Access Method
+        }
+        lov {
+            type: staticValues
+            staticValues: STATIC2:IN;IN,OUT;OUT,IN OUT;INOUT
+            displayNullValue: false
+        }
+        layout {
+            sequence: 60
+            region: @parameter
+            slot: regionBody
+            startNewRow: false
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+        }
+        default {
+            type: static
+            staticValue: IN
+        }
+        help {
+            helpText: IN parameters are read from the request, OUT parameters are written to the response.
+        }
+    )
+
+    pageItem P14_PARAM_TYPE (
+        type: selectList
+        label {
+            label: Data Type
+        }
+        lov {
+            type: staticValues
+            staticValues: STATIC2:STRING;STRING,INT;INT,DOUBLE;DOUBLE,BOOLEAN;BOOLEAN,LONG;LONG,TIMESTAMP;TIMESTAMP,RESULTSET;RESULTSET,VECTOR;VECTOR
+            displayExtraValues: true
+            displayNullValue: false
+        }
+        layout {
+            sequence: 70
+            region: @parameter
+            slot: regionBody
+            startNewRow: false
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+        }
+        default {
+            type: static
+            staticValue: STRING
+        }
+        help {
+            helpText: Data type of the value. RESULTSET returns a cursor of a PL/SQL handler as a JSON array.
+        }
+    )
+
+    pageItem P14_COMMENTS (
+        type: textField
+        label {
+            label: Comments
+        }
+        layout {
+            sequence: 80
+            region: @parameter
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            maxLength: 4000
+        }
+    )
+
+    button cancel (
+        buttonName: CANCEL
+        label: Cancel
+        layout {
+            sequence: 10
+            region: @buttons
+            slot: close
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: #DEFAULT#
+        }
+        behavior {
+            action: definedByDynamicAction
+        }
+    )
+
+    button delete (
+        buttonName: DELETE
+        label: Delete
+        layout {
+            sequence: 20
+            region: @buttons
+            slot: delete
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: [
+                #DEFAULT#
+                t-Button--danger
+                t-Button--simple
+            ]
+        }
+        behavior {
+            executeValidations: false
+            warnOnUnsavedChanges: doNotCheck
+            requiresConfirmation: true
+        }
+        confirmation {
+            message: Delete this parameter?
+            style: danger
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P14_ID
+        }
+    )
+
+    button save (
+        buttonName: SAVE
+        label: Save
+        layout {
+            sequence: 30
+            region: @buttons
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text
+            hot: true
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    dynamicAction cancel-dialog (
+        name: Cancel Dialog
+        execution {
+            sequence: 10
+        }
+        when {
+            event: click
+            selectionType: button
+            button: @cancel
+        }
+
+        action native-dialog-cancel (
+            action: cancelDialog
+            execution {
+                sequence: 10
+                fireOnInit: false
+            }
+        )
+
+    )
+
+    process load-parameter (
+        name: Load Parameter
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                for p in ( select handler_id, name, bind_variable_name, source_type, access_method, param_type, comments
+                             from user_ords_parameters
+                            where id = :P14_ID )
+                loop
+                    :P14_HANDLER_ID         := p.handler_id;
+                    :P14_NAME               := p.name;
+                    :P14_BIND_VARIABLE_NAME := p.bind_variable_name;
+                    :P14_SOURCE_TYPE        := p.source_type;
+                    :P14_ACCESS_METHOD      := p.access_method;
+                    :P14_PARAM_TYPE         := p.param_type;
+                    :P14_COMMENTS           := p.comments;
+                end loop;
+                ```
+        }
+        execution {
+            sequence: 10
+            point: beforeHeader
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P14_ID
+        }
+        advanced {
+            executionMappingIdentifier: 1401
+        }
+    )
+
+    process save-parameter (
+        name: Save Parameter
+        type: plugin/restaurantEngine
+        settings {
+            action: PARAMETER_SAVE
+        }
+        execution {
+            sequence: 10
+        }
+        serverSideCondition {
+            type: request=Value
+            value: SAVE
+        }
+        advanced {
+            executionMappingIdentifier: 1402
+        }
+    )
+
+    process delete-parameter (
+        name: Delete Parameter
+        type: plugin/restaurantEngine
+        settings {
+            action: PARAMETER_DELETE
+        }
+        execution {
+            sequence: 20
+        }
+        serverSideCondition {
+            type: request=Value
+            value: DELETE
+        }
+        advanced {
+            executionMappingIdentifier: 1403
+        }
+    )
+
+    process close-dialog (
+        name: Close Dialog
+        type: closeDialog
+        execution {
+            sequence: 30
+        }
+        advanced {
+            executionMappingIdentifier: 1404
+        }
+    )
+
+)

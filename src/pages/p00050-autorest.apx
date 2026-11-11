@@ -1,0 +1,151 @@
+page 50 (
+    name: AutoREST Objects
+    alias: AUTOREST
+    title: AutoREST Objects
+    pageGroup: @services
+    appearance {
+        pageTemplate: @/standard
+        templateOptions: #DEFAULT#
+    }
+    navigation {
+        cursorFocus: doNotFocusCursor
+    }
+    help {
+        helpText: AutoREST publishes a table, view or PL/SQL object as a ready made REST service without writing handlers. Tables and views get endpoints to query, insert, update and delete rows.
+    }
+
+    region heading (
+        name: Heading
+        title: AutoREST Objects
+        type: staticContent
+        source {
+            htmlCode: Tables, views and PL/SQL objects that ORDS publishes automatically, without handlers.
+        }
+        layout {
+            sequence: 10
+            slot: breadcrumbBar
+        }
+        appearance {
+            template: @/hero
+            templateOptions: #DEFAULT#
+            icon: fa-table
+        }
+    )
+
+    region objects (
+        name: Objects
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    l_html   clob;
+                    l_buffer varchar2(32767);
+                    l_count  pls_integer := 0;
+                    l_url    varchar2(4000);
+
+                    procedure p (p_text in varchar2) is
+                    begin
+                        if nvl(lengthb(l_buffer), 0) + nvl(lengthb(p_text), 0) > 32000 then
+                            dbms_lob.writeappend(l_html, length(l_buffer), l_buffer);
+                            l_buffer := null;
+                        end if;
+                        l_buffer := l_buffer || p_text;
+                    end p;
+                begin
+                    dbms_lob.createtemporary(l_html, true);
+                    p('<div class="rst-toolbar"><input type="search" class="rst-filter" data-target="#rst-objects" placeholder="Filter objects" aria-label="Filter objects"></div>');
+                    p('<table class="rst-table" id="rst-objects"><thead><tr><th>Object</th><th>Type</th><th>Status</th><th>Access</th><th>URL</th><th>Changed</th></tr></thead><tbody>');
+                    for o in ( select id, parsing_object, object_alias, type, status, auto_rest_auth, updated_on, updated_by
+                                 from user_ords_enabled_objects
+                                order by parsing_object )
+                    loop
+                        l_count := l_count + 1;
+                        l_url   := case when :G_REST_BASE is not null then :G_REST_BASE || '/' || o.object_alias || '/' end;
+                        p('<tr><td><a class="rst-strong" href="' || apex_page.get_url(p_page => 51, p_items => 'P51_ID', p_values => o.id, p_clear_cache => '51') || '">'
+                          || apex_escape.html(o.parsing_object) || '</a></td>'
+                          || '<td>' || apex_escape.html(initcap(o.type)) || '</td>'
+                          || '<td><span class="rst-status rst-status--' || case o.status when 'ENABLED' then 'on">Enabled' else 'off">Disabled' end || '</span></td>'
+                          || '<td>' || case o.auto_rest_auth when 'ENABLED' then '<span class="fa fa-lock" aria-hidden="true"></span> Authorization required' else '<span class="rst-muted">Public</span>' end || '</td>'
+                          || '<td>' || case when l_url is not null then '<a class="rst-path" target="_blank" rel="noopener" href="' || apex_escape.html_attribute(l_url) || '">' || apex_escape.html(l_url) || '</a>' end || '</td>'
+                          || '<td><span title="' || apex_escape.html_attribute(o.updated_by) || '">' || apex_escape.html(apex_util.get_since(o.updated_on)) || '</span></td></tr>');
+                    end loop;
+                    p('</tbody></table>');
+                    if l_count = 0 then
+                        p('<div class="rst-empty"><span class="fa fa-table" aria-hidden="true"></span>'
+                          || '<p>No objects are REST enabled.</p><p class="rst-muted">Enable a table or view to get a complete REST API for it.</p></div>');
+                    end if;
+                    if l_buffer is not null then
+                        dbms_lob.writeappend(l_html, length(l_buffer), l_buffer);
+                    end if;
+                    return l_html;
+                end;
+                ```
+        }
+        layout {
+            sequence: 20
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: [
+                #DEFAULT#
+                t-Region--noPadding
+                t-Region--hideHeader js-addHiddenHeadingRoleDesc
+                t-Region--scrollBody
+            ]
+        }
+    )
+
+    button create (
+        buttonName: CREATE
+        label: Enable Object
+        layout {
+            sequence: 10
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            hot: true
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-plus
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 51
+                clearCache: 51
+            }
+        }
+    )
+
+    dynamicAction dialog-closed (
+        name: Dialog Closed
+        execution {
+            sequence: 10
+        }
+        when {
+            event: apexafterclosedialog
+            selectionType: jsExpression
+            javaScriptExpression: document
+        }
+
+        action native-refresh (
+            action: refresh
+            affectedElements {
+                selectionType: region
+                region: @objects
+            }
+            execution {
+                sequence: 10
+                fireOnInit: false
+            }
+        )
+
+    )
+
+)

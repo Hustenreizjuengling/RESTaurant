@@ -1,0 +1,16 @@
+pageGroup administration (
+    name: Administration
+)
+
+pageGroup security (
+    name: Security
+)
+
+pageGroup services (
+    name: Services
+)
+
+pageGroup transfer (
+    name: Export and Import
+)
+

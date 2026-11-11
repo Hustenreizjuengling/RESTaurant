@@ -1,0 +1,10 @@
+appItem G_REST_BASE (
+    scope: app
+    security {
+        sessionStateProtection: restricted
+    }
+    comments {
+        comments: Base URL of the RESTful services of the parsing schema, for example https://host/ords/hr. Empty when the schema is not enabled for ORDS.
+    }
+)
+

@@ -1,0 +1,203 @@
+page 10 (
+    name: Modules
+    alias: MODULES
+    title: Modules
+    pageGroup: @services
+    appearance {
+        pageTemplate: @/left-side-column
+        templateOptions: #DEFAULT#
+    }
+    navigation {
+        cursorFocus: doNotFocusCursor
+    }
+    help {
+        helpText: Lists the resource modules of the schema. Open a module to edit its templates and handlers, or use the tree on the left to jump to any element.
+    }
+
+    region heading (
+        name: Heading
+        title: Modules
+        type: staticContent
+        source {
+            htmlCode: Resource modules group the templates and handlers of a RESTful service.
+        }
+        layout {
+            sequence: 10
+            slot: breadcrumbBar
+        }
+        appearance {
+            template: @/hero
+            templateOptions: #DEFAULT#
+            icon: fa-sitemap-horizontal
+        }
+    )
+
+    region service-tree (
+        name: Service Tree
+        type: plugin/restaurantTree
+        layout {
+            sequence: 10
+            slot: leftColumn
+        }
+        appearance {
+            template: @/blank-with-attributes
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region modules (
+        name: Modules
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    l_html   clob;
+                    l_buffer varchar2(32767);
+                    l_count  pls_integer := 0;
+
+                    procedure p (p_text in varchar2) is
+                    begin
+                        if nvl(lengthb(l_buffer), 0) + nvl(lengthb(p_text), 0) > 32000 then
+                            dbms_lob.writeappend(l_html, length(l_buffer), l_buffer);
+                            l_buffer := null;
+                        end if;
+                        l_buffer := l_buffer || p_text;
+                    end p;
+                begin
+                    dbms_lob.createtemporary(l_html, true);
+                    p('<div class="rst-toolbar"><input type="search" class="rst-filter" data-target="#rst-modules" placeholder="Filter modules" aria-label="Filter modules"></div>');
+                    p('<table class="rst-table" id="rst-modules"><thead><tr>'
+                      || '<th>Module</th><th>Base path</th><th>Status</th><th class="rst-num">Templates</th><th class="rst-num">Handlers</th><th>Protected by</th><th>Changed</th><th></th>'
+                      || '</tr></thead><tbody>');
+                    for m in ( select m.id, m.name, m.uri_prefix, m.status, m.comments, m.updated_on, m.updated_by,
+                                      ( select count(*) from user_ords_templates t where t.module_id = m.id ) templates,
+                                      ( select count(*)
+                                          from user_ords_templates t
+                                          join user_ords_handlers h on h.template_id = t.id
+                                         where t.module_id = m.id ) handlers,
+                                      ( select max(pm.privilege_name) from user_ords_privilege_modules pm where pm.module_id = m.id ) privilege_name
+                                 from user_ords_modules m
+                                order by m.name )
+                    loop
+                        l_count := l_count + 1;
+                        p('<tr><td><a class="rst-strong" href="' || apex_page.get_url(p_page => 11, p_items => 'P11_ID', p_values => m.id) || '">'
+                          || apex_escape.html(m.name) || '</a>'
+                          || case when m.comments is not null then '<div class="rst-muted">' || apex_escape.html(m.comments) || '</div>' end
+                          || '</td><td><span class="rst-path">' || apex_escape.html(m.uri_prefix) || '</span></td>'
+                          || '<td><span class="rst-status rst-status--' || case m.status when 'PUBLISHED' then 'on">Published' else 'off">Not published' end || '</span></td>'
+                          || '<td class="rst-num">' || m.templates || '</td><td class="rst-num">' || m.handlers || '</td>'
+                          || '<td>' || case when m.privilege_name is not null
+                                            then '<span class="fa fa-lock" aria-hidden="true"></span> ' || apex_escape.html(m.privilege_name)
+                                            else '<span class="rst-muted">Public</span>' end || '</td>'
+                          || '<td><span title="' || apex_escape.html_attribute(m.updated_by) || '">' || apex_escape.html(apex_util.get_since(m.updated_on)) || '</span></td>'
+                          || '<td class="rst-actions">'
+                          || '<a class="rst-icon-link" title="Export as JSON" aria-label="Export as JSON" href="'
+                          || apex_page.get_url(p_page => 61, p_clear_cache => '61', p_items => 'P61_SCOPE,P61_ID,P61_FORMAT,P61_INCLUDE_SECURITY', p_values => 'MODULE,' || m.id || ',JSON,Y')
+                          || '"><span class="fa fa-download" aria-hidden="true"></span></a></td></tr>');
+                    end loop;
+                    p('</tbody></table>');
+                    if l_count = 0 then
+                        p('<div class="rst-empty"><span class="fa fa-cubes" aria-hidden="true"></span>'
+                          || '<p>This schema has no resource modules yet.</p>'
+                          || '<p class="rst-muted">Create the first module or import an export file.</p></div>');
+                    end if;
+                    if l_buffer is not null then
+                        dbms_lob.writeappend(l_html, length(l_buffer), l_buffer);
+                    end if;
+                    return l_html;
+                end;
+                ```
+        }
+        layout {
+            sequence: 20
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: [
+                #DEFAULT#
+                t-Region--noPadding
+                t-Region--hideHeader js-addHiddenHeadingRoleDesc
+                t-Region--scrollBody
+            ]
+        }
+    )
+
+    button create (
+        buttonName: CREATE
+        label: Create Module
+        layout {
+            sequence: 10
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            hot: true
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-plus
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 11
+                clearCache: 11
+            }
+        }
+    )
+
+    button export (
+        buttonName: EXPORT
+        label: Export
+        layout {
+            sequence: 20
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-download
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 60
+                clearCache: 60
+            }
+        }
+    )
+
+    button import (
+        buttonName: IMPORT
+        label: Import
+        layout {
+            sequence: 30
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconLeft
+            ]
+            icon: fa-upload
+        }
+        behavior {
+            action: redirectThisApp
+            target: {
+                page: 70
+                clearCache: 70
+            }
+        }
+    )
+
+)

@@ -1,0 +1,465 @@
+page 21 (
+    name: Privilege
+    alias: PRIVILEGE
+    title: Privilege
+    pageGroup: @security
+    appearance {
+        pageMode: modalDialog
+        dialogTemplate: @/modal-dialog
+        templateOptions: #DEFAULT#
+    }
+    dialog {
+        width: 760
+        chained: false
+    }
+    help {
+        helpText: A privilege protects the modules and URL patterns you assign to it. Callers need at least one of its roles. Without roles any authenticated user is accepted.
+    }
+
+    region privilege (
+        name: Privilege
+        type: staticContent
+        layout {
+            sequence: 10
+            slot: contentBody
+        }
+        appearance {
+            template: @/blank-with-attributes
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region buttons (
+        name: Buttons
+        type: staticContent
+        layout {
+            sequence: 20
+            slot: dialogFooter
+        }
+        appearance {
+            template: @/buttons-container
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    pageItem P21_ID (
+        type: hidden
+        layout {
+            sequence: 10
+            region: @privilege
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P21_NAME (
+        type: textField
+        label {
+            label: Name
+        }
+        layout {
+            sequence: 20
+            region: @privilege
+            slot: regionBody
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+            valuePlaceholder: orders.manage
+        }
+        validation {
+            valueRequired: true
+            maxLength: 255
+        }
+        help {
+            helpText: Unique name without spaces, for example <strong>orders.manage</strong>. OAuth clients request the privilege by this name as a scope.
+        }
+    )
+
+    pageItem P21_LABEL (
+        type: textField
+        label {
+            label: Label
+        }
+        layout {
+            sequence: 30
+            region: @privilege
+            slot: regionBody
+            startNewRow: false
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            maxLength: 255
+        }
+        help {
+            helpText: Title shown to the user when an application asks for access. Needed for three-legged OAuth flows.
+        }
+    )
+
+    pageItem P21_DESCRIPTION (
+        type: textField
+        label {
+            label: Description
+        }
+        layout {
+            sequence: 40
+            region: @privilege
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            maxLength: 4000
+        }
+        help {
+            helpText: Explains the purpose of the privilege to the user who approves access.
+        }
+    )
+
+    pageItem P21_ROLES (
+        type: selectMany
+        label {
+            label: Roles
+        }
+        lov {
+            type: sqlQuery
+            sqlQuery:
+                ```sql
+                select name d, name r
+                  from user_ords_roles
+                 order by case when name like 'oracle.%' then 2 else 1 end, name
+                ```
+        }
+        layout {
+            sequence: 50
+            region: @privilege
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        multipleValues {
+            type: delimitedList
+            separator: :
+        }
+        help {
+            helpText: A caller needs at least one of these roles. Leave empty to accept any authenticated user.
+        }
+    )
+
+    pageItem P21_MODULES (
+        type: selectMany
+        label {
+            label: Protected Modules
+        }
+        lov {
+            type: sqlQuery
+            sqlQuery:
+                ```sql
+                select name d, name r
+                  from user_ords_modules
+                 order by 1
+                ```
+        }
+        layout {
+            sequence: 60
+            region: @privilege
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        multipleValues {
+            type: delimitedList
+            separator: :
+        }
+        help {
+            helpText: All templates of these modules require the privilege. A module can be protected by one privilege only, so selecting it here takes it away from another privilege.
+        }
+    )
+
+    pageItem P21_PATTERNS (
+        type: textarea
+        label {
+            label: Protected URL Patterns
+        }
+        layout {
+            sequence: 70
+            region: @privilege
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+            cssClasses: rst-code
+            height: 3
+        }
+        validation {
+            maxLength: 4000
+        }
+        help {
+            helpText: One pattern per line, relative to the schema, for example <strong>/orders/v1/admin/*</strong>. Use patterns to protect a part of a module or automatically REST enabled objects.
+        }
+    )
+
+    pageItem P21_COMMENTS (
+        type: textField
+        label {
+            label: Comments
+        }
+        layout {
+            sequence: 80
+            region: @privilege
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            maxLength: 4000
+        }
+    )
+
+    button cancel (
+        buttonName: CANCEL
+        label: Cancel
+        layout {
+            sequence: 10
+            region: @buttons
+            slot: close
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: #DEFAULT#
+        }
+        behavior {
+            action: definedByDynamicAction
+        }
+    )
+
+    button delete (
+        buttonName: DELETE
+        label: Delete
+        layout {
+            sequence: 20
+            region: @buttons
+            slot: delete
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: [
+                #DEFAULT#
+                t-Button--danger
+                t-Button--simple
+            ]
+        }
+        behavior {
+            executeValidations: false
+            warnOnUnsavedChanges: doNotCheck
+            requiresConfirmation: true
+        }
+        confirmation {
+            message: Delete this privilege? The modules and patterns it protects become public.
+            style: danger
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P21_ID
+        }
+    )
+
+    button save (
+        buttonName: SAVE
+        label: Save
+        layout {
+            sequence: 30
+            region: @buttons
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text
+            hot: true
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    dynamicAction cancel-dialog (
+        name: Cancel Dialog
+        execution {
+            sequence: 10
+        }
+        when {
+            event: click
+            selectionType: button
+            button: @cancel
+        }
+
+        action native-dialog-cancel (
+            action: cancelDialog
+            execution {
+                sequence: 10
+                fireOnInit: false
+            }
+        )
+
+    )
+
+    process load-privilege (
+        name: Load Privilege
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                for v in ( select name, label, description, comments
+                             from user_ords_privileges
+                            where id = :P21_ID )
+                loop
+                    :P21_NAME        := v.name;
+                    :P21_LABEL       := v.label;
+                    :P21_DESCRIPTION := v.description;
+                    :P21_COMMENTS    := v.comments;
+                    select listagg(role_name, ':') within group (order by role_name)
+                      into :P21_ROLES
+                      from user_ords_privilege_roles
+                     where privilege_id = :P21_ID;
+                    select listagg(module_name, ':') within group (order by module_name)
+                      into :P21_MODULES
+                      from user_ords_privilege_modules
+                     where privilege_id = :P21_ID;
+                    select listagg(pattern, chr(10)) within group (order by pattern)
+                      into :P21_PATTERNS
+                      from user_ords_privilege_mappings
+                     where privilege_id = :P21_ID;
+                end loop;
+                ```
+        }
+        execution {
+            sequence: 10
+            point: beforeHeader
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P21_ID
+        }
+        advanced {
+            executionMappingIdentifier: 2101
+        }
+    )
+
+    process save-privilege (
+        name: Save Privilege
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                declare
+                    l_roles    owa.vc_arr;
+                    l_patterns owa.vc_arr;
+                    l_modules  owa.vc_arr;
+                    l_old_name varchar2(255);
+                    l_count    number;
+
+                    procedure fill (p_target in out nocopy owa.vc_arr, p_values in apex_t_varchar2) is
+                    begin
+                        for i in 1 .. p_values.count loop
+                            if trim(p_values(i)) is not null then
+                                p_target(p_target.count + 1) := trim(p_values(i));
+                            end if;
+                        end loop;
+                    end fill;
+
+                    procedure invalid (p_message in varchar2) is
+                    begin
+                        apex_error.add_error(
+                            p_message          => p_message,
+                            p_display_location => apex_error.c_inline_with_field_and_notif,
+                            p_page_item_name   => 'P21_NAME' );
+                    end invalid;
+                begin
+                    :P21_NAME := trim(:P21_NAME);
+                    select count(*) into l_count from user_ords_privileges
+                     where name = :P21_NAME and ( :P21_ID is null or id <> :P21_ID );
+                    if regexp_like(:P21_NAME, '\s') then
+                        invalid('The name must not contain spaces.');
+                        return;
+                    elsif l_count > 0 then
+                        invalid('A privilege with this name already exists.');
+                        return;
+                    end if;
+                    if :P21_ID is not null then
+                        select name into l_old_name from user_ords_privileges where id = :P21_ID;
+                        if l_old_name <> :P21_NAME then
+                            ords.rename_privilege(p_name => l_old_name, p_new_name => :P21_NAME);
+                        end if;
+                    end if;
+                    fill(l_roles, apex_string.split(:P21_ROLES, ':'));
+                    fill(l_modules, apex_string.split(:P21_MODULES, ':'));
+                    fill(l_patterns, apex_string.split(replace(:P21_PATTERNS, chr(13)), chr(10)));
+                    ords.define_privilege(
+                        p_privilege_name => :P21_NAME,
+                        p_roles          => l_roles,
+                        p_patterns       => l_patterns,
+                        p_modules        => l_modules,
+                        p_label          => :P21_LABEL,
+                        p_description    => :P21_DESCRIPTION,
+                        p_comments       => :P21_COMMENTS );
+                end;
+                ```
+        }
+        execution {
+            sequence: 10
+        }
+        serverSideCondition {
+            type: request=Value
+            value: SAVE
+        }
+        advanced {
+            executionMappingIdentifier: 2102
+        }
+    )
+
+    process delete-privilege (
+        name: Delete Privilege
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                for v in ( select name from user_ords_privileges where id = :P21_ID ) loop
+                    ords.delete_privilege(p_name => v.name);
+                end loop;
+                ```
+        }
+        execution {
+            sequence: 20
+        }
+        serverSideCondition {
+            type: request=Value
+            value: DELETE
+        }
+        advanced {
+            executionMappingIdentifier: 2103
+        }
+    )
+
+    process close-dialog (
+        name: Close Dialog
+        type: closeDialog
+        execution {
+            sequence: 30
+        }
+        advanced {
+            executionMappingIdentifier: 2104
+        }
+    )
+
+)

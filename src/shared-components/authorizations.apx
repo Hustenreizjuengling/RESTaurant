@@ -1,0 +1,16 @@
+authorization ist-admin (
+    name: IST_ADMIN
+    type: existsSqlQuery
+    settings {
+        sqlQuery: select 1 from dual
+    }
+    error {
+        errorMessage: You are not allowed to manage the RESTful services of this schema.
+    }
+    advanced {
+        evaluationType: perSession
+    }
+    comments {
+        comments: Guards the whole application. As delivered the query always returns a row, so every authenticated user is an administrator. Replace the query to restrict access, for example with a lookup of :APP_USER.
+    }
+)

@@ -1,0 +1,262 @@
+page 31 (
+    name: Role
+    alias: ROLE
+    title: Role
+    pageGroup: @security
+    appearance {
+        pageMode: modalDialog
+        dialogTemplate: @/modal-dialog
+        templateOptions: #DEFAULT#
+    }
+    dialog {
+        width: 520
+        chained: false
+    }
+    help {
+        helpText: A role has a name only. Assign it to privileges and grant it to OAuth clients.
+    }
+
+    region role (
+        name: Role
+        type: staticContent
+        layout {
+            sequence: 10
+            slot: contentBody
+        }
+        appearance {
+            template: @/blank-with-attributes
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region buttons (
+        name: Buttons
+        type: staticContent
+        layout {
+            sequence: 20
+            slot: dialogFooter
+        }
+        appearance {
+            template: @/buttons-container
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    pageItem P31_ID (
+        type: hidden
+        layout {
+            sequence: 10
+            region: @role
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P31_NAME (
+        type: textField
+        label {
+            label: Role Name
+        }
+        layout {
+            sequence: 20
+            region: @role
+            slot: regionBody
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+        }
+        validation {
+            valueRequired: true
+            maxLength: 255
+        }
+    )
+
+    button cancel (
+        buttonName: CANCEL
+        label: Cancel
+        layout {
+            sequence: 10
+            region: @buttons
+            slot: close
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: #DEFAULT#
+        }
+        behavior {
+            action: definedByDynamicAction
+        }
+    )
+
+    button delete (
+        buttonName: DELETE
+        label: Delete
+        layout {
+            sequence: 20
+            region: @buttons
+            slot: delete
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: [
+                #DEFAULT#
+                t-Button--danger
+                t-Button--simple
+            ]
+        }
+        behavior {
+            executeValidations: false
+            warnOnUnsavedChanges: doNotCheck
+            requiresConfirmation: true
+        }
+        confirmation {
+            message: Delete this role? It is removed from all privileges and clients.
+            style: danger
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P31_ID
+        }
+    )
+
+    button save (
+        buttonName: SAVE
+        label: Save
+        layout {
+            sequence: 30
+            region: @buttons
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text
+            hot: true
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    dynamicAction cancel-dialog (
+        name: Cancel Dialog
+        execution {
+            sequence: 10
+        }
+        when {
+            event: click
+            selectionType: button
+            button: @cancel
+        }
+
+        action native-dialog-cancel (
+            action: cancelDialog
+            execution {
+                sequence: 10
+                fireOnInit: false
+            }
+        )
+
+    )
+
+    process load-role (
+        name: Load Role
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                for r in ( select name from user_ords_roles where id = :P31_ID ) loop
+                    :P31_NAME := r.name;
+                end loop;
+                ```
+        }
+        execution {
+            sequence: 10
+            point: beforeHeader
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P31_ID
+        }
+        advanced {
+            executionMappingIdentifier: 3101
+        }
+    )
+
+    process save-role (
+        name: Save Role
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                declare
+                    l_old_name varchar2(255);
+                    l_count    number;
+                begin
+                    :P31_NAME := trim(:P31_NAME);
+                    select count(*) into l_count from user_ords_roles
+                     where name = :P31_NAME and ( :P31_ID is null or id <> :P31_ID );
+                    if l_count > 0 then
+                        apex_error.add_error(
+                            p_message          => 'A role with this name already exists.',
+                            p_display_location => apex_error.c_inline_with_field_and_notif,
+                            p_page_item_name   => 'P31_NAME' );
+                        return;
+                    end if;
+                    if :P31_ID is null then
+                        ords.create_role(p_role_name => :P31_NAME);
+                    else
+                        select name into l_old_name from user_ords_roles where id = :P31_ID;
+                        if l_old_name <> :P31_NAME then
+                            ords.rename_role(p_role_name => l_old_name, p_new_name => :P31_NAME);
+                        end if;
+                    end if;
+                end;
+                ```
+        }
+        execution {
+            sequence: 10
+        }
+        serverSideCondition {
+            type: request=Value
+            value: SAVE
+        }
+        advanced {
+            executionMappingIdentifier: 3102
+        }
+    )
+
+    process delete-role (
+        name: Delete Role
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                for r in ( select name from user_ords_roles where id = :P31_ID ) loop
+                    ords.delete_role(p_role_name => r.name);
+                end loop;
+                ```
+        }
+        execution {
+            sequence: 20
+        }
+        serverSideCondition {
+            type: request=Value
+            value: DELETE
+        }
+        advanced {
+            executionMappingIdentifier: 3103
+        }
+    )
+
+    process close-dialog (
+        name: Close Dialog
+        type: closeDialog
+        execution {
+            sequence: 30
+        }
+        advanced {
+            executionMappingIdentifier: 3104
+        }
+    )
+
+)

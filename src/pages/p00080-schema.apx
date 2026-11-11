@@ -1,0 +1,372 @@
+page 80 (
+    name: Schema Settings
+    alias: SCHEMA
+    title: Schema Settings
+    pageGroup: @administration
+    appearance {
+        pageTemplate: @/standard
+        templateOptions: #DEFAULT#
+    }
+    navigation {
+        cursorFocus: doNotFocusCursor
+    }
+    help {
+        helpText: A schema has to be enabled for ORDS before its services can be called. The schema alias is the part of the URL that identifies the schema.
+    }
+
+    region heading (
+        name: Heading
+        title: Schema Settings
+        type: staticContent
+        source {
+            htmlCode: How Oracle REST Data Services publishes the schema &P80_SCHEMA.
+        }
+        layout {
+            sequence: 10
+            slot: breadcrumbBar
+        }
+        appearance {
+            template: @/hero
+            templateOptions: #DEFAULT#
+            icon: fa-gear
+        }
+    )
+
+    region access (
+        name: Access
+        title: REST access
+        type: staticContent
+        layout {
+            sequence: 20
+            slot: body
+            columnSpan: 7
+        }
+        appearance {
+            template: @/standard
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region environment (
+        name: Environment
+        type: dynamicContent
+        source {
+            plsqlFunctionBody:
+                ```plsql
+                declare
+                    l_html varchar2(32767);
+                    l_apex varchar2(100);
+                begin
+                    select max(version_no) into l_apex from apex_release;
+                    l_html := '<dl class="rst-kv">'
+                        || '<dt>Schema</dt><dd>' || apex_escape.html(sys_context('userenv', 'current_schema')) || '</dd>'
+                        || '<dt>ORDS version</dt><dd>' || apex_escape.html(ords.installed_version) || '</dd>'
+                        || '<dt>APEX version</dt><dd>' || apex_escape.html(l_apex) || '</dd>'
+                        || '<dt>Application</dt><dd>RESTaurant ' || apex_escape.html(v('APP_VERSION')) || '</dd>'
+                        || '<dt>Service URL</dt><dd>';
+                    if :G_REST_BASE is not null then
+                        l_html := l_html || '<span class="rst-mono" id="rst-base-url">' || apex_escape.html(:G_REST_BASE || '/') || '</span>'
+                            || ' <button type="button" class="rst-copy" data-copy-from="#rst-base-url" title="Copy" aria-label="Copy service URL"><span class="fa fa-copy" aria-hidden="true"></span></button>'
+                            || '</dd><dt>API catalog</dt><dd><a class="rst-mono" target="_blank" rel="noopener" href="'
+                            || apex_escape.html_attribute(:G_REST_BASE || '/open-api-catalog/') || '">' || apex_escape.html(:G_REST_BASE || '/open-api-catalog/') || '</a>';
+                    else
+                        l_html := l_html || '<span class="rst-muted">The schema is not enabled.</span>';
+                    end if;
+                    return l_html || '</dd></dl>';
+                end;
+                ```
+        }
+        layout {
+            sequence: 30
+            slot: body
+            startNewRow: false
+        }
+        appearance {
+            template: @/standard
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region danger (
+        name: Remove REST Definitions
+        title: Remove all REST definitions
+        type: staticContent
+        source {
+            htmlCode: <p>Deletes every module, privilege, role, OAuth client and AutoREST setting of this schema and unregisters the schema from ORDS. This cannot be undone. Export the schema first if you might need the services again.</p>
+        }
+        layout {
+            sequence: 40
+            slot: body
+            columnSpan: 7
+        }
+        appearance {
+            template: @/collapsible
+            templateOptions: [
+                #DEFAULT#
+                is-collapsed
+                t-Region--scrollBody
+            ]
+        }
+        serverSideCondition {
+            type: rowsReturned
+            sqlQuery: select 1 from user_ords_schemas
+        }
+    )
+
+    pageItem P80_SCHEMA (
+        type: hidden
+        layout {
+            sequence: 10
+            region: @access
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: restricted
+        }
+    )
+
+    pageItem P80_ENABLED (
+        type: switch
+        label {
+            label: REST enabled
+        }
+        settings {
+            useDefaults: false
+            onValue: Y
+            onLabel: Enabled
+            offValue: N
+            offLabel: Disabled
+        }
+        layout {
+            sequence: 20
+            region: @access
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        help {
+            helpText: While the schema is disabled none of its services can be called. The definitions are kept.
+        }
+    )
+
+    pageItem P80_PATTERN (
+        type: textField
+        label {
+            label: Schema Alias
+        }
+        layout {
+            sequence: 30
+            region: @access
+            slot: regionBody
+        }
+        appearance {
+            template: @/required-floating
+            templateOptions: #DEFAULT#
+            cssClasses: rst-mono
+        }
+        validation {
+            valueRequired: true
+            maxLength: 255
+        }
+        help {
+            helpText: Part of the URL that identifies the schema, for example <strong>hr</strong> in https://host/ords/hr/. Changing the alias changes the URL of every service of the schema.
+        }
+    )
+
+    pageItem P80_AUTH (
+        type: switch
+        label {
+            label: Authorization required for metadata
+        }
+        settings {
+            useDefaults: false
+            onValue: Y
+            onLabel: Required
+            offValue: N
+            offLabel: Public
+        }
+        layout {
+            sequence: 40
+            region: @access
+            slot: regionBody
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        help {
+            helpText: Controls whether the metadata catalog and the OpenAPI description of the schema can be read without authentication.
+        }
+    )
+
+    pageItem P80_CONFIRM (
+        type: textField
+        label {
+            label: Type the schema name to confirm
+        }
+        layout {
+            sequence: 10
+            region: @danger
+            slot: regionBody
+            columnSpan: 6
+        }
+        appearance {
+            template: @/optional-floating
+            templateOptions: #DEFAULT#
+        }
+        sessionState {
+            storage: request
+        }
+    )
+
+    button save (
+        buttonName: SAVE
+        label: Save
+        layout {
+            sequence: 10
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text
+            hot: true
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    button unregister (
+        buttonName: UNREGISTER
+        label: Remove All REST Definitions
+        layout {
+            sequence: 20
+            region: @danger
+            slot: regionBody
+        }
+        appearance {
+            buttonTemplate: @/text
+            templateOptions: [
+                #DEFAULT#
+                t-Button--danger
+            ]
+        }
+        behavior {
+            executeValidations: false
+            warnOnUnsavedChanges: doNotCheck
+            requiresConfirmation: true
+        }
+        confirmation {
+            message: Permanently delete all REST definitions of this schema?
+            style: danger
+        }
+    )
+
+    process load-schema (
+        name: Load Schema
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                :P80_SCHEMA  := sys_context('userenv', 'current_schema');
+                :P80_ENABLED := 'N';
+                :P80_AUTH    := 'N';
+                :P80_PATTERN := lower(:P80_SCHEMA);
+                for s in ( select pattern, status, auto_rest_auth from user_ords_schemas ) loop
+                    :P80_ENABLED := case s.status when 'ENABLED' then 'Y' else 'N' end;
+                    :P80_AUTH    := case s.auto_rest_auth when 'ENABLED' then 'Y' else 'N' end;
+                    :P80_PATTERN := s.pattern;
+                end loop;
+                ```
+        }
+        execution {
+            sequence: 10
+            point: beforeHeader
+        }
+        advanced {
+            executionMappingIdentifier: 8001
+        }
+    )
+
+    process save-schema (
+        name: Save Schema
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                declare
+                    l_pattern varchar2(255) := trim(both '/' from trim(:P80_PATTERN));
+                begin
+                    for s in ( select pattern, status from user_ords_schemas ) loop
+                        if s.status = 'ENABLED' and s.pattern <> l_pattern then
+                            -- the alias of an enabled schema cannot be changed
+                            ords.enable_schema(p_enabled => false);
+                        end if;
+                    end loop;
+                    ords.enable_schema(
+                        p_enabled             => :P80_ENABLED = 'Y',
+                        p_url_mapping_type    => 'BASE_PATH',
+                        p_url_mapping_pattern => l_pattern,
+                        p_auto_rest_auth      => :P80_AUTH = 'Y' );
+                end;
+                ```
+        }
+        execution {
+            sequence: 10
+        }
+        successMessage {
+            successMessage: Schema settings saved.
+        }
+        serverSideCondition {
+            type: request=Value
+            value: SAVE
+        }
+        advanced {
+            executionMappingIdentifier: 8002
+        }
+    )
+
+    process unregister-schema (
+        name: Remove REST Definitions
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                if upper(trim(:P80_CONFIRM)) = sys_context('userenv', 'current_schema') then
+                    ords.drop_rest_for_schema;
+                else
+                    apex_error.add_error(
+                        p_message          => 'Type the name of the schema to confirm. Nothing was removed.',
+                        p_display_location => apex_error.c_inline_with_field_and_notif,
+                        p_page_item_name   => 'P80_CONFIRM' );
+                end if;
+                ```
+        }
+        execution {
+            sequence: 20
+        }
+        successMessage {
+            successMessage: All REST definitions of the schema were removed.
+        }
+        serverSideCondition {
+            type: request=Value
+            value: UNREGISTER
+        }
+        advanced {
+            executionMappingIdentifier: 8003
+        }
+    )
+
+    branch reload (
+        name: Reload
+        execution {
+            sequence: 10
+        }
+        behavior {
+            target: {
+                page: 80
+            }
+        }
+    )
+
+)

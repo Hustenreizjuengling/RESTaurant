@@ -1,0 +1,200 @@
+page 70 (
+    name: Import
+    alias: IMPORT
+    title: Import
+    pageGroup: @transfer
+    appearance {
+        pageTemplate: @/standard
+        templateOptions: #DEFAULT#
+    }
+    navigation {
+        cursorFocus: doNotFocusCursor
+        warnOnUnsavedChanges: false
+    }
+    advanced {
+        reloadOnSubmit: always
+    }
+    help {
+        helpText:
+            ```html
+            <p>Imports an export of this application: a JSON file, a ZIP archive with JSON files or JSON text from the clipboard.</p>
+            <p>Nothing is changed on this page. The next step shows what the file contains and how it differs from the schema, and lets you decide what to import.</p>
+            ```
+    }
+
+    region heading (
+        name: Heading
+        title: Import
+        type: staticContent
+        source {
+            htmlCode: Load an export file. You review the changes before anything is written.
+        }
+        layout {
+            sequence: 10
+            slot: breadcrumbBar
+        }
+        appearance {
+            template: @/hero
+            templateOptions: #DEFAULT#
+            icon: fa-upload
+        }
+    )
+
+    region steps (
+        name: Steps
+        type: staticContent
+        source {
+            htmlCode:
+                ```html
+                <ol class="rst-steps">
+                    <li class="is-active"><span>1</span> Load the export</li>
+                    <li><span>2</span> Review and import</li>
+                </ol>
+                ```
+        }
+        layout {
+            sequence: 20
+            slot: body
+        }
+        appearance {
+            template: @/blank-with-attributes
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region file (
+        name: File
+        title: Export file
+        type: staticContent
+        layout {
+            sequence: 30
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    region paste (
+        name: Paste
+        title: Or paste the JSON
+        type: staticContent
+        layout {
+            sequence: 40
+            slot: body
+        }
+        appearance {
+            template: @/collapsible
+            templateOptions: [
+                #DEFAULT#
+                is-collapsed
+                t-Region--scrollBody
+            ]
+        }
+    )
+
+    pageItem P70_FILE (
+        type: fileUpload
+        label {
+            label: Export File
+        }
+        display {
+            displayAs: blockDropzone
+            dropzoneTitle: Drop a .json or .zip export here
+            dropzoneDesc: or click to choose a file
+        }
+        storage {
+            type: appTempFiles
+            purgeFileAt: endOfRequest
+            fileTypes: .json,.zip,application/json,application/zip
+        }
+        layout {
+            sequence: 10
+            region: @file
+            slot: regionBody
+        }
+        appearance {
+            template: @/hidden
+            templateOptions: #DEFAULT#
+        }
+        help {
+            helpText: A JSON export of RESTaurant or a ZIP archive that contains such JSON files.
+        }
+    )
+
+    pageItem P70_TEXT (
+        type: textarea
+        label {
+            label: JSON
+        }
+        settings {
+            trimSpaces: none
+        }
+        layout {
+            sequence: 10
+            region: @paste
+            slot: regionBody
+        }
+        appearance {
+            template: @/hidden
+            templateOptions: [
+                #DEFAULT#
+                t-Form-fieldContainer--stretchInputs
+            ]
+            cssClasses: rst-code
+            height: 12
+        }
+        sessionState {
+            dataType: clob
+            storage: request
+        }
+    )
+
+    button continue (
+        buttonName: CONTINUE
+        label: Continue
+        layout {
+            sequence: 10
+            region: @heading
+            slot: next
+        }
+        appearance {
+            buttonTemplate: @/text-with-icon
+            hot: true
+            templateOptions: [
+                #DEFAULT#
+                t-Button--iconRight
+            ]
+            icon: fa-chevron-right
+        }
+    )
+
+    process load-export (
+        name: Load Export
+        type: plugin/restaurantEngine
+        settings {
+            action: IMPORT_LOAD
+        }
+        execution {
+            sequence: 10
+        }
+        advanced {
+            executionMappingIdentifier: 7001
+        }
+    )
+
+    branch review (
+        name: Review
+        execution {
+            sequence: 10
+        }
+        behavior {
+            target: {
+                page: 71
+                clearCache: 71
+            }
+        }
+    )
+
+)

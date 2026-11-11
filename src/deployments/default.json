@@ -1,0 +1,11 @@
+{
+  "workspace": {
+    "name": "RESTAURANT"
+  },
+  "app": {
+    "id": 14850,
+    "databaseSession": {
+      "parsingSchema": "RESTAURANT"
+    }
+  }
+}

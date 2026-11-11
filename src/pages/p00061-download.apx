@@ -1,0 +1,148 @@
+page 61 (
+    name: Download Export
+    alias: DOWNLOAD
+    title: Download Export
+    pageGroup: @transfer
+    appearance {
+        pageTemplate: @/standard
+        templateOptions: #DEFAULT#
+    }
+    help {
+        helpText: Sends an export as a file. The page has no content of its own, it is the target of the export links of the other pages.
+    }
+
+    region export (
+        name: Export
+        type: staticContent
+        source {
+            htmlCode: The download should have started. <a href="&P61_BACK_URL!ATTR.">Back to the modules</a>
+        }
+        layout {
+            sequence: 10
+            slot: body
+        }
+        appearance {
+            template: @/standard
+            templateOptions: #DEFAULT#
+        }
+    )
+
+    pageItem P61_SCOPE (
+        type: hidden
+        layout {
+            sequence: 10
+            region: @export
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P61_ID (
+        type: hidden
+        layout {
+            sequence: 20
+            region: @export
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P61_MODULES (
+        type: hidden
+        layout {
+            sequence: 30
+            region: @export
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P61_FORMAT (
+        type: hidden
+        layout {
+            sequence: 40
+            region: @export
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P61_INCLUDE_SECURITY (
+        type: hidden
+        layout {
+            sequence: 50
+            region: @export
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P61_INCLUDE_META (
+        type: hidden
+        layout {
+            sequence: 60
+            region: @export
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: checksumRequiredSessionLevel
+        }
+    )
+
+    pageItem P61_BACK_URL (
+        type: hidden
+        layout {
+            sequence: 70
+            region: @export
+            slot: regionBody
+        }
+        security {
+            sessionStateProtection: restricted
+        }
+    )
+
+    process download (
+        name: Download
+        type: plugin/restaurantEngine
+        settings {
+            action: EXPORT_DOWNLOAD
+        }
+        execution {
+            sequence: 10
+            point: beforeHeader
+        }
+        serverSideCondition {
+            type: itemIsNotNull
+            item: P61_SCOPE
+        }
+        advanced {
+            executionMappingIdentifier: 6101
+        }
+    )
+
+    process set-back-url (
+        name: Set Back URL
+        type: executeCode
+        source {
+            plsqlCode: :P61_BACK_URL := apex_page.get_url(p_page => 10);
+        }
+        execution {
+            sequence: 20
+            point: beforeHeader
+        }
+        advanced {
+            executionMappingIdentifier: 6102
+        }
+    )
+
+)
