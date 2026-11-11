@@ -101,6 +101,7 @@ page 80 (
         }
         appearance {
             template: @/collapsible
+            renderComponents: belowContent
             templateOptions: [
                 #DEFAULT#
                 is-collapsed
@@ -213,8 +214,11 @@ page 80 (
             columnSpan: 6
         }
         appearance {
-            template: @/optional-floating
-            templateOptions: #DEFAULT#
+            template: @/optional-above
+            templateOptions: [
+                #DEFAULT#
+                t-Form-fieldContainer--stretchInputs
+            ]
         }
         sessionState {
             storage: request
