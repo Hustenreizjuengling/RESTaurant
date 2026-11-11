@@ -1,0 +1,45 @@
+{
+  "format": "restaurant-ords",
+  "version": 1,
+  "modules": [
+    {
+      "name": "menu.v1",
+      "basePath": "/menu/v1/",
+      "itemsPerPage": 25,
+      "status": "PUBLISHED",
+      "comments": "Public menu of the restaurant",
+      "partial": true,
+      "templates": [
+        {
+          "uriTemplate": "dishes/",
+          "priority": 0,
+          "etagType": "HASH",
+          "comments": "All dishes",
+          "handlers": [
+            {
+              "method": "GET",
+              "sourceType": "json/collection",
+              "comments": "Optional filter: ?course=MAIN",
+              "source": [
+                "select dish_id, name, course, price, vegetarian",
+                "  from dishes",
+                " where course = nvl(upper(:course), course)",
+                " order by course, name"
+              ],
+              "parameters": [
+                {
+                  "name": "course",
+                  "bindVariable": "course",
+                  "sourceType": "URI",
+                  "paramType": "STRING",
+                  "accessMethod": "IN",
+                  "comments": "STARTER, MAIN or DESSERT"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

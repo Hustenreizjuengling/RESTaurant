@@ -273,3 +273,5 @@ a.rst-stat:hover, a.rst-stat:focus { border-color: var(--rst-accent); transform:
 .rst-about img { border-radius: 16px; }
 .rst-about h2 { margin: 0 0 .25rem; font-size: 1.25rem; }
 .rst-about p { margin: 0; }
+.rst-try-output { max-height: 20rem; }
+.rst-try-response-headers { max-height: 10rem; margin-bottom: .5rem; }

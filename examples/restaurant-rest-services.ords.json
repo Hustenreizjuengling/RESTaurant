@@ -1,0 +1,204 @@
+{
+  "format": "restaurant-ords",
+  "version": 1,
+  "roles": [
+    "kitchen_staff"
+  ],
+  "privileges": [
+    {
+      "name": "kitchen.manage",
+      "label": "Kitchen management",
+      "description": "Maintain dishes and see reservations",
+      "comments": "Sample privilege",
+      "roles": [
+        "kitchen_staff"
+      ],
+      "patterns": [
+        "/kitchen/internal/*"
+      ],
+      "modules": [
+        "kitchen.v1"
+      ]
+    }
+  ],
+  "modules": [
+    {
+      "name": "kitchen.v1",
+      "basePath": "/kitchen/v1/",
+      "itemsPerPage": 50,
+      "status": "PUBLISHED",
+      "comments": "Back office services",
+      "templates": [
+        {
+          "uriTemplate": "dishes/",
+          "priority": 0,
+          "etagType": "HASH",
+          "handlers": [
+            {
+              "method": "POST",
+              "sourceType": "plsql/block",
+              "mimesAllowed": "application/json",
+              "source": [
+                "begin",
+                "    insert into dishes (name, course, price, vegetarian)",
+                "    values (:name, upper(:course), :price, nvl(:vegetarian, 'N'))",
+                "    returning dish_id into :id;",
+                "",
+                "    :status   := 201;",
+                "    :location := 'dishes/' || :id;",
+                "end;"
+              ],
+              "parameters": [
+                {
+                  "name": "Location",
+                  "bindVariable": "location",
+                  "sourceType": "HEADER",
+                  "paramType": "STRING",
+                  "accessMethod": "OUT"
+                },
+                {
+                  "name": "X-ORDS-STATUS-CODE",
+                  "bindVariable": "status",
+                  "sourceType": "HEADER",
+                  "paramType": "INT",
+                  "accessMethod": "OUT"
+                },
+                {
+                  "name": "id",
+                  "bindVariable": "id",
+                  "sourceType": "RESPONSE",
+                  "paramType": "INT",
+                  "accessMethod": "OUT"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "uriTemplate": "dishes/:id",
+          "priority": 0,
+          "etagType": "HASH",
+          "handlers": [
+            {
+              "method": "DELETE",
+              "sourceType": "plsql/block",
+              "source": [
+                "begin",
+                "    delete from dishes where dish_id = :id;",
+                "    :status := case when sql%rowcount = 0 then 404 else 204 end;",
+                "end;"
+              ],
+              "parameters": [
+                {
+                  "name": "X-ORDS-STATUS-CODE",
+                  "bindVariable": "status",
+                  "sourceType": "HEADER",
+                  "paramType": "INT",
+                  "accessMethod": "OUT"
+                }
+              ]
+            },
+            {
+              "method": "PUT",
+              "sourceType": "plsql/block",
+              "mimesAllowed": "application/json",
+              "source": [
+                "begin",
+                "    update dishes",
+                "       set name       = nvl(:name, name),",
+                "           price      = nvl(:price, price),",
+                "           vegetarian = nvl(:vegetarian, vegetarian)",
+                "     where dish_id = :id;",
+                "",
+                "    :status := case when sql%rowcount = 0 then 404 else 200 end;",
+                "end;"
+              ],
+              "parameters": [
+                {
+                  "name": "X-ORDS-STATUS-CODE",
+                  "bindVariable": "status",
+                  "sourceType": "HEADER",
+                  "paramType": "INT",
+                  "accessMethod": "OUT"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "uriTemplate": "reservations/",
+          "priority": 0,
+          "etagType": "HASH",
+          "handlers": [
+            {
+              "method": "GET",
+              "sourceType": "json/collection",
+              "source": [
+                "select reservation_id, guest_name, seats, reserved_for, status",
+                "  from reservations",
+                " order by reserved_for"
+              ],
+              "parameters": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "menu.v1",
+      "basePath": "/menu/v1/",
+      "itemsPerPage": 25,
+      "status": "PUBLISHED",
+      "comments": "Public menu of the restaurant",
+      "templates": [
+        {
+          "uriTemplate": "dishes/",
+          "priority": 0,
+          "etagType": "HASH",
+          "comments": "All dishes",
+          "handlers": [
+            {
+              "method": "GET",
+              "sourceType": "json/collection",
+              "comments": "Optional filter: ?course=MAIN",
+              "source": [
+                "select dish_id, name, course, price, vegetarian",
+                "  from dishes",
+                " where course = nvl(upper(:course), course)",
+                " order by course, name"
+              ],
+              "parameters": [
+                {
+                  "name": "course",
+                  "bindVariable": "course",
+                  "sourceType": "URI",
+                  "paramType": "STRING",
+                  "accessMethod": "IN",
+                  "comments": "STARTER, MAIN or DESSERT"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "uriTemplate": "dishes/:id",
+          "priority": 0,
+          "etagType": "HASH",
+          "comments": "A single dish",
+          "handlers": [
+            {
+              "method": "GET",
+              "sourceType": "json/item",
+              "source": [
+                "select dish_id, name, course, price, vegetarian, created_on",
+                "  from dishes",
+                " where dish_id = :id"
+              ],
+              "parameters": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

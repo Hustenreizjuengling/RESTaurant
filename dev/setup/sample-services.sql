@@ -184,6 +184,26 @@ end;]' );
         p_description    => 'Maintain dishes and see reservations',
         p_comments       => 'Sample privilege' );
 
+    ----------------------------------------------------------------------------
+    -- an OAuth client for the back office and an AutoREST table
+    ----------------------------------------------------------------------------
+    ords_security.register_client(
+        p_name            => 'kitchen-display',
+        p_grant_type      => 'client_credentials',
+        p_support_email   => 'kitchen@example.com',
+        p_description     => 'Screen in the kitchen that shows the reservations',
+        p_privilege_names => 'kitchen.manage' );
+    ords_security.grant_client_role(
+        p_client_name => 'kitchen-display',
+        p_role_name   => 'kitchen_staff' );
+
+    ords.enable_object(
+        p_enabled        => true,
+        p_object         => 'RESERVATIONS',
+        p_object_type    => 'TABLE',
+        p_object_alias   => 'reservations',
+        p_auto_rest_auth => true );
+
     commit;
 end;
 /

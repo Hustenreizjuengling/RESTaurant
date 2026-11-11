@@ -1,0 +1,67 @@
+{
+  "format": "restaurant-ords",
+  "version": 1,
+  "modules": [
+    {
+      "name": "kitchen.v1",
+      "basePath": "/kitchen/v1/",
+      "itemsPerPage": 50,
+      "status": "PUBLISHED",
+      "comments": "Back office services",
+      "partial": true,
+      "templates": [
+        {
+          "uriTemplate": "dishes/:id",
+          "priority": 0,
+          "etagType": "HASH",
+          "handlers": [
+            {
+              "method": "DELETE",
+              "sourceType": "plsql/block",
+              "source": [
+                "begin",
+                "    delete from dishes where dish_id = :id;",
+                "    :status := case when sql%rowcount = 0 then 404 else 204 end;",
+                "end;"
+              ],
+              "parameters": [
+                {
+                  "name": "X-ORDS-STATUS-CODE",
+                  "bindVariable": "status",
+                  "sourceType": "HEADER",
+                  "paramType": "INT",
+                  "accessMethod": "OUT"
+                }
+              ]
+            },
+            {
+              "method": "PUT",
+              "sourceType": "plsql/block",
+              "mimesAllowed": "application/json",
+              "source": [
+                "begin",
+                "    update dishes",
+                "       set name       = nvl(:name, name),",
+                "           price      = nvl(:price, price),",
+                "           vegetarian = nvl(:vegetarian, vegetarian)",
+                "     where dish_id = :id;",
+                "",
+                "    :status := case when sql%rowcount = 0 then 404 else 200 end;",
+                "end;"
+              ],
+              "parameters": [
+                {
+                  "name": "X-ORDS-STATUS-CODE",
+                  "bindVariable": "status",
+                  "sourceType": "HEADER",
+                  "paramType": "INT",
+                  "accessMethod": "OUT"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

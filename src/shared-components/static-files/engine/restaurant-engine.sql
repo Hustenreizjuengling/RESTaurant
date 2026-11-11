@@ -313,6 +313,9 @@ declare
         put(l_result, 'mleEnvironment', get_text(p_handler, 'mleEnvironment'));
         put(l_result, 'comments', get_text(p_handler, 'comments'));
         put_source(l_result, 'source', get_source(p_handler, 'source'));
+        if l_result.get('source').is_array and l_result.get_array('source').get_size = 0 then
+            invalid(l_context || ': the handler has no source.');
+        end if;
         for i in 0 .. l_params.get_size - 1 loop
             l_param := norm_parameter(as_object(l_params.get(i)), l_context);
             l_key   := l_param.get_string('name');

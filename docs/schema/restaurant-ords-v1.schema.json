@@ -1,0 +1,157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Hustenreizjuengling/RESTaurant/main/docs/schema/restaurant-ords-v1.schema.json",
+  "title": "RESTaurant exchange format, version 1",
+  "description": "ORDS RESTful services: modules with templates, handlers and parameters, optionally roles and privileges.",
+  "type": "object",
+  "required": ["format", "version"],
+  "properties": {
+    "format": {
+      "const": "restaurant-ords"
+    },
+    "version": {
+      "const": 1
+    },
+    "meta": {
+      "type": "object",
+      "description": "Details about the export. Ignored on import.",
+      "properties": {
+        "generator": { "type": "string" },
+        "exportedAt": { "type": "string", "format": "date-time" },
+        "schema": { "type": "string" },
+        "ordsVersion": { "type": "string" }
+      }
+    },
+    "roles": {
+      "type": "array",
+      "description": "Names of the roles to create.",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "privileges": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/privilege" }
+    },
+    "modules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/module" }
+    }
+  },
+  "$defs": {
+    "names": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "privilege": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^\\S+$", "maxLength": 255 },
+        "label": { "type": "string", "maxLength": 255 },
+        "description": { "type": "string", "maxLength": 4000 },
+        "comments": { "type": "string", "maxLength": 4000 },
+        "roles": { "$ref": "#/$defs/names" },
+        "patterns": { "$ref": "#/$defs/names" },
+        "modules": { "$ref": "#/$defs/names" }
+      }
+    },
+    "module": {
+      "type": "object",
+      "required": ["name", "basePath"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "basePath": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "itemsPerPage": { "type": "integer", "minimum": 0, "default": 25 },
+        "status": { "enum": ["PUBLISHED", "NOT_PUBLISHED"], "default": "PUBLISHED" },
+        "originsAllowed": { "type": "string", "maxLength": 4000 },
+        "comments": { "type": "string", "maxLength": 4000 },
+        "partial": {
+          "type": "boolean",
+          "default": false,
+          "description": "The module is the context of a template or handler export. An import only adds to it."
+        },
+        "templates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/template" }
+        }
+      }
+    },
+    "template": {
+      "type": "object",
+      "required": ["uriTemplate"],
+      "properties": {
+        "uriTemplate": { "type": "string", "minLength": 1, "maxLength": 600 },
+        "priority": { "type": "integer", "minimum": 0, "maximum": 9, "default": 0 },
+        "etagType": { "enum": ["HASH", "QUERY", "NONE"], "default": "HASH" },
+        "etagQuery": { "type": "string", "maxLength": 4000 },
+        "comments": { "type": "string", "maxLength": 4000 },
+        "handlers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/handler" }
+        }
+      },
+      "if": {
+        "required": ["etagType"],
+        "properties": { "etagType": { "const": "QUERY" } }
+      },
+      "then": {
+        "required": ["etagQuery"]
+      }
+    },
+    "handler": {
+      "type": "object",
+      "required": ["method", "sourceType", "source"],
+      "properties": {
+        "method": { "enum": ["GET", "POST", "PUT", "DELETE"] },
+        "sourceType": {
+          "enum": [
+            "json/collection",
+            "json/item",
+            "resource/lob",
+            "plsql/block",
+            "mle/javascript",
+            "json/query",
+            "csv/query",
+            "json/query;type=single",
+            "json/query;type=feed"
+          ]
+        },
+        "itemsPerPage": { "type": "integer", "minimum": 0 },
+        "mimesAllowed": { "type": "string", "maxLength": 255 },
+        "mleEnvironment": { "type": "string", "maxLength": 255 },
+        "comments": { "type": "string", "maxLength": 4000 },
+        "source": {
+          "description": "The query or the code, as one string per line or as a single string.",
+          "oneOf": [
+            { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+            { "type": "string", "minLength": 1 }
+          ]
+        },
+        "parameters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/parameter" }
+        }
+      },
+      "if": {
+        "required": ["method"],
+        "properties": { "method": { "enum": ["POST", "PUT", "DELETE"] } }
+      },
+      "then": {
+        "properties": { "sourceType": { "enum": ["plsql/block", "mle/javascript"] } }
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "bindVariable": { "type": "string", "maxLength": 30 },
+        "sourceType": { "enum": ["HEADER", "URI", "RESPONSE"], "default": "HEADER" },
+        "paramType": { "type": "string", "default": "STRING" },
+        "accessMethod": { "enum": ["IN", "OUT", "INOUT"], "default": "IN" },
+        "comments": { "type": "string", "maxLength": 4000 }
+      }
+    }
+  }
+}

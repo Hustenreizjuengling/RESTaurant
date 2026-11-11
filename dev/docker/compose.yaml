@@ -5,9 +5,10 @@
 # APEX : http://localhost:8282/ords/
 # DB   : localhost:1522/FREEPDB1
 #
-# A second sandbox with other versions runs side by side, for example
+# A second sandbox with another APEX or ORDS release runs side by side when
+# it gets its own project name, image tag and ports, for example
 #
-#   ORDS_URL=https://download.oracle.com/otn_software/java/ords/ords-24.4.0.345.1601.zip #   IMAGE_TAG=ords-24.4 HTTP_PORT=8383 DB_PORT=1523 #   docker compose -p restaurant-ords244 -f dev/docker/compose.yaml up -d --build
+#   APEX_URL=https://download.oracle.com/otn_software/apex/apex-latest.zip #   IMAGE_TAG=apex-latest HTTP_PORT=8383 DB_PORT=1523 #   docker compose -p restaurant-next -f dev/docker/compose.yaml up -d --build
 #
 # The credentials below are throw-away defaults for a local sandbox.
 # Override them through the environment for anything else.
