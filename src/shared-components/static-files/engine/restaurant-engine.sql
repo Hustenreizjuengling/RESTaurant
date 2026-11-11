@@ -14,7 +14,7 @@
 --   :message  success message of the operation (out)
 --------------------------------------------------------------------------------
 declare
-    c_app_version    constant varchar2(20) := '1.1.0';
+    c_app_version    constant varchar2(20) := '1.1.1';
     c_format         constant varchar2(30) := 'restaurant-ords';
     c_format_version constant pls_integer  := 1;
     c_doc            constant varchar2(30) := 'RESTAURANT_DOC';
@@ -717,6 +717,19 @@ declare
         return l_result;
     end to_vc_arr;
 
+    -- defines a privilege exactly as described
+    procedure define_privilege (p_privilege in json_object_t) is
+    begin
+        ords.define_privilege(
+            p_privilege_name => p_privilege.get_string('name'),
+            p_roles          => to_vc_arr(get_array(p_privilege, 'roles')),
+            p_patterns       => to_vc_arr(get_array(p_privilege, 'patterns')),
+            p_modules        => to_vc_arr(get_array(p_privilege, 'modules')),
+            p_label          => p_privilege.get_string('label'),
+            p_description    => p_privilege.get_string('description'),
+            p_comments       => p_privilege.get_string('comments') );
+    end define_privilege;
+
     -- defines a privilege; module links of an existing privilege are kept and
     -- modules that do not exist in this schema are ignored
     procedure apply_privilege (p_privilege in json_object_t) is
@@ -742,15 +755,30 @@ declare
             l_modules.append(l_key);
             l_key := l_set.next(l_key);
         end loop;
-        ords.define_privilege(
-            p_privilege_name => l_name,
-            p_roles          => to_vc_arr(get_array(p_privilege, 'roles')),
-            p_patterns       => to_vc_arr(get_array(p_privilege, 'patterns')),
-            p_modules        => to_vc_arr(l_modules),
-            p_label          => p_privilege.get_string('label'),
-            p_description    => p_privilege.get_string('description'),
-            p_comments       => p_privilege.get_string('comments') );
+        define_privilege(with_children(p_privilege, 'modules', l_modules));
     end apply_privilege;
+
+    -- takes a module away from the privilege that protects it; ORDS has no call
+    -- for that, so the privilege is defined again without the module
+    procedure unprotect_module (p_module in varchar2, p_privilege in varchar2) is
+        l_privilege json_object_t;
+        l_modules   json_array_t;
+        l_kept      json_array_t := json_array_t();
+        l_id        number;
+    begin
+        select max(id) into l_id from user_ords_privileges where name = p_privilege;
+        if l_id is null then
+            return;
+        end if;
+        l_privilege := privilege_object(l_id);
+        l_modules   := get_array(l_privilege, 'modules');
+        for i in 0 .. l_modules.get_size - 1 loop
+            if l_modules.get_string(i) <> p_module then
+                l_kept.append(l_modules.get_string(i));
+            end if;
+        end loop;
+        define_privilege(with_children(l_privilege, 'modules', l_kept));
+    end unprotect_module;
 
     --------------------------------------------------------------------------------
     -- merging an incoming module into an existing one
@@ -1432,6 +1460,13 @@ declare
             p_c001            => 'EXPORT',
             p_c002            => l_file_name,
             p_clob001         => l_content );
+    exception
+        when e_user then
+            -- nothing to show yet, for example because no module is selected
+            apex_collection.add_member(
+                p_collection_name => c_doc,
+                p_c001            => 'EXPORT',
+                p_c003            => regexp_replace(sqlerrm, '^ORA-20999: ') );
     end export_preview;
 
     --------------------------------------------------------------------------------
@@ -2137,7 +2172,12 @@ declare
         end if;
         select max(privilege_name) into l_old_privilege from user_ords_privilege_modules where module_name = l_name;
         if nvl(l_old_privilege, chr(0)) <> nvl(l_privilege, chr(0)) then
-            ords.set_module_privilege(p_module_name => l_name, p_privilege_name => l_privilege);
+            if l_old_privilege is not null then
+                unprotect_module(l_name, l_old_privilege);
+            end if;
+            if l_privilege is not null then
+                ords.set_module_privilege(p_module_name => l_name, p_privilege_name => l_privilege);
+            end if;
         end if;
         set_item('ID', module_id(l_name));
     end module_save;

@@ -126,6 +126,7 @@ list navigation-menu (
         link {
             target: {
                 page: 60
+                clearCache: 60
             }
         }
     )

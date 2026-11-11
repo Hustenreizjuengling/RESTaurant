@@ -603,8 +603,11 @@ page 11 (
                     :P11_PRIVILEGE       := m.privilege_name;
                     return;
                 end loop;
-                -- the module was deleted in the meantime or a new one is created
-                :P11_ID := null;
+                if :P11_ID is not null then
+                    -- the module was deleted in the meantime
+                    :P11_ID := null;
+                    apex_util.redirect_url(apex_page.get_url(p_page => 10));
+                end if;
                 ```
         }
         execution {

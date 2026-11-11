@@ -521,28 +521,31 @@ page 12 (
         source {
             plsqlCode:
                 ```plsql
-                :P12_TITLE := 'New Template';
-                for t in ( select module_id, uri_template, priority, etag_type, etag_query, comments
-                             from user_ords_templates
-                            where id = :P12_ID )
-                loop
-                    :P12_TITLE        := t.uri_template;
-                    :P12_MODULE_ID    := t.module_id;
-                    :P12_URI_TEMPLATE := t.uri_template;
-                    :P12_PRIORITY     := t.priority;
-                    :P12_ETAG_TYPE    := t.etag_type;
-                    :P12_ETAG_QUERY   := t.etag_query;
-                    :P12_COMMENTS     := t.comments;
-                end loop;
-                if :P12_URI_TEMPLATE is null then
-                    :P12_ID := null;
-                end if;
-                select max(name) into :P12_MODULE_NAME from user_ords_modules where id = :P12_MODULE_ID;
-                :P12_MODULE_URL := apex_page.get_url(p_page => 11, p_items => 'P11_ID', p_values => :P12_MODULE_ID);
-                if :P12_MODULE_NAME is null then
-                    -- neither the template nor its module exist any more
-                    apex_util.redirect_url(apex_page.get_url(p_page => 10));
-                end if;
+                declare
+                    l_found boolean := false;
+                begin
+                    :P12_TITLE := 'New Template';
+                    for t in ( select module_id, uri_template, priority, etag_type, etag_query, comments
+                                 from user_ords_templates
+                                where id = :P12_ID )
+                    loop
+                        l_found           := true;
+                        :P12_TITLE        := t.uri_template;
+                        :P12_MODULE_ID    := t.module_id;
+                        :P12_URI_TEMPLATE := t.uri_template;
+                        :P12_PRIORITY     := t.priority;
+                        :P12_ETAG_TYPE    := t.etag_type;
+                        :P12_ETAG_QUERY   := t.etag_query;
+                        :P12_COMMENTS     := t.comments;
+                    end loop;
+                    select max(name) into :P12_MODULE_NAME from user_ords_modules where id = :P12_MODULE_ID;
+                    :P12_MODULE_URL := apex_page.get_url(p_page => 11, p_items => 'P11_ID', p_values => :P12_MODULE_ID);
+                    if ( :P12_ID is not null and not l_found ) or :P12_MODULE_NAME is null then
+                        -- the template or its module was deleted in the meantime
+                        :P12_ID := null;
+                        apex_util.redirect_url(apex_page.get_url(p_page => 10));
+                    end if;
+                end;
                 ```
         }
         execution {

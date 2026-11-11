@@ -7,3 +7,7 @@
 *.swp
 .DS_Store
 Thumbs.db
+
+# test tooling
+node_modules/
+tests/e2e/output/

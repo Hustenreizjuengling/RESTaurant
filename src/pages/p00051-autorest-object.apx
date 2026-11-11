@@ -13,7 +13,7 @@ page 51 (
         chained: false
     }
     help {
-        helpText: Publishes a database object through AutoREST. The alias is the path of the object below the URL of the schema.
+        helpText: Publishes a database object through AutoREST. The alias is the path of the object below the URL of the schema. A disabled object keeps its settings but is not published.
     }
 
     region object (
@@ -63,14 +63,12 @@ page 51 (
             type: sqlQuery
             sqlQuery:
                 ```sql
-                select object_name || ' (' || lower(object_type) || ')' d,
-                       object_type || ':' || object_name r
-                  from user_objects
-                 where object_type in ('TABLE', 'VIEW', 'PACKAGE', 'PROCEDURE', 'FUNCTION')
-                   and object_name not like 'BIN$%'
-                   and ( :P51_ID is not null
-                         or object_name not in ( select parsing_object from user_ords_enabled_objects ) )
-                 order by object_type desc, object_name
+                select parsing_object || ' (' || lower(type) || ')' d,
+                       type || ':' || parsing_object r
+                  from user_ords_objects
+                 where id is null
+                    or id = :P51_ID
+                 order by type desc, parsing_object
                 ```
             displayNullValue: true
             nullDisplayValue: - Select an object -
@@ -268,7 +266,7 @@ page 51 (
             plsqlCode:
                 ```plsql
                 for o in ( select parsing_object, object_alias, type, status, auto_rest_auth
-                             from user_ords_enabled_objects
+                             from user_ords_objects
                             where id = :P51_ID )
                 loop
                     :P51_OBJECT  := o.type || ':' || o.parsing_object;
@@ -323,7 +321,7 @@ page 51 (
         source {
             plsqlCode:
                 ```plsql
-                for o in ( select parsing_object from user_ords_enabled_objects where id = :P51_ID ) loop
+                for o in ( select parsing_object from user_ords_objects where id = :P51_ID ) loop
                     ords.drop_rest_for_object(p_object => o.parsing_object);
                 end loop;
                 ```

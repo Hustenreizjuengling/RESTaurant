@@ -304,3 +304,12 @@ a.rst-stat:hover, a.rst-stat:focus { border-color: var(--rst-accent); transform:
 .rst-check.is-error { border-color: var(--rst-delete); background: color-mix(in srgb, var(--rst-delete) 9%, transparent); cursor: pointer; }
 .rst-check.is-error:hover, .rst-check.is-error:focus { background: color-mix(in srgb, var(--rst-delete) 15%, transparent); }
 .rst-check:disabled { opacity: 1; }
+
+/* ---------- messages ----------
+   Success and error messages appear at the bottom of the window. At the top they
+   would cover the buttons of the page header. Dialogs keep them at the top,
+   their buttons are at the bottom. */
+body:not(.t-Dialog-page) .t-Alert--page {
+  top: auto;
+  bottom: 1rem;
+}

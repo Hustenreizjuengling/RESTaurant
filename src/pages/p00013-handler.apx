@@ -389,8 +389,22 @@ page 13 (
             label: Source Type
         }
         lov {
-            type: staticValues
-            staticValues: STATIC2:Collection Query;json/collection,Collection Query Item;json/item,PL/SQL;plsql/block,Media Resource;resource/lob,MLE JavaScript;mle/javascript,Query (legacy);json/query,Query as CSV (legacy);csv/query,Query One Row (legacy);json/query\;type=single,Feed (legacy);json/query\;type=feed
+            type: sqlQuery
+            sqlQuery:
+                ```sql
+                select d, r
+                  from ( select 'Collection Query' d, 'json/collection' r, 1 pos from dual union all
+                         select 'Collection Query Item', 'json/item', 2 from dual union all
+                         select 'PL/SQL', 'plsql/block', 3 from dual union all
+                         select 'Media Resource', 'resource/lob', 4 from dual union all
+                         select 'MLE JavaScript', 'mle/javascript', 5 from dual union all
+                         select 'Query (legacy)', 'json/query', 6 from dual union all
+                         select 'Query as CSV (legacy)', 'csv/query', 7 from dual union all
+                         select 'Query One Row (legacy)', 'json/query;type=single', 8 from dual union all
+                         select 'Feed (legacy)', 'json/query;type=feed', 9 from dual )
+                 order by pos
+                ```
+            displayExtraValues: true
             displayNullValue: false
         }
         layout {
@@ -882,8 +896,12 @@ page 13 (
                         :P13_COMMENTS        := h.comments;
                         apex_session_state.set_value(p_item => 'P13_SOURCE', p_value => h.source);
                     end loop;
-                    if not l_found then
+                    if not l_found and :P13_ID is not null then
+                        -- the handler was deleted in the meantime
                         :P13_ID := null;
+                        apex_util.redirect_url(apex_page.get_url(p_page => 10));
+                    end if;
+                    if not l_found then
                         -- suggest the first method the template does not answer yet
                         select min(m.method) keep (dense_rank first order by m.pos)
                           into :P13_METHOD

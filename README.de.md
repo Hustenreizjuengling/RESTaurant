@@ -217,11 +217,27 @@ Der erste Start installiert APEX in die Datenbank und dauert eine Weile. `dev/se
 legt den Workspace `RESTAURANT` mit gleichnamigem Schema und den Entwickler `DEV` an; die Passwörter stehen im Skript
 und sind nur für eine lokale Sandbox gedacht.
 
+### Tests
+
+`tests/e2e` spielt die Anwendung im Browser so durch, wie ein Benutzer es täte: Es beginnt mit einem Schema ohne
+REST-Definitionen, baut einen Service, ruft ihn per HTTP auf, schützt ihn, exportiert und importiert ihn in ein zweites
+Schema, macht ihn kaputt und repariert ihn und entfernt am Ende alles wieder. Abgedeckt sind auch die Fehlerfälle
+aller Formulare, ein Schema mit mehr als 300 Handlern und eine Kopie der Anwendung, deren `IST_ADMIN` keine Zeile
+liefert.
+
+```
+scripts/dev.sh test          # Testschemas zurücksetzen, dist/restaurant.sql installieren, alle Prüfungen ausführen
+```
+
+Der Lauf braucht Node.js und die Sandbox und installiert Playwright beim ersten Mal.
+
 ## Gut zu wissen
 
 - Handler unterstützen die Methoden GET, POST, PUT und DELETE.
 - Wird bei einem Modul die Seitengröße oder der Kommentar geändert, definiert das Speichern das Modul neu. Templates
   und Handler werden unverändert zurückgeschrieben, tragen danach aber den Zeitpunkt des Speicherns als Änderungsdatum.
+- ORDS braucht einen Moment, um manche Änderungen zu bemerken. Nach einem solchen Speichern kann ein Service etwa eine
+  Sekunde lang mit 404 antworten, und ein AutoREST-Objekt bleibt einige Sekunden unter seinem alten Alias erreichbar.
 - Die Request-Konsole sendet den Request aus dem Browser, ohne die Session-Cookies der Anwendung. Für einen
   geschützten Service wird ein `Authorization`-Header ergänzt.
 - ORDS vermerkt in seinen Audit-Spalten den Datenbankbenutzer. Änderungen über APEX zeigen dort den öffentlichen

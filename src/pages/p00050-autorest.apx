@@ -55,20 +55,21 @@ page 50 (
                 begin
                     dbms_lob.createtemporary(l_html, true);
                     p('<div class="rst-toolbar"><input type="search" class="rst-filter" data-target="#rst-objects" placeholder="Filter objects" aria-label="Filter objects"></div>');
-                    p('<table class="rst-table" id="rst-objects"><thead><tr><th>Object</th><th>Type</th><th>Status</th><th>Access</th><th>URL</th><th>Changed</th></tr></thead><tbody>');
-                    for o in ( select id, parsing_object, object_alias, type, status, auto_rest_auth, updated_on, updated_by
-                                 from user_ords_enabled_objects
+                    p('<table class="rst-table" id="rst-objects"><thead><tr><th>Object</th><th>Type</th><th>Status</th><th>Access</th><th>URL</th></tr></thead><tbody>');
+                    -- the view lists every object of the schema, the ones with an id have a REST definition
+                    for o in ( select id, parsing_object, object_alias, type, status, auto_rest_auth
+                                 from user_ords_objects
+                                where id is not null
                                 order by parsing_object )
                     loop
                         l_count := l_count + 1;
-                        l_url   := case when :G_REST_BASE is not null then :G_REST_BASE || '/' || o.object_alias || '/' end;
+                        l_url   := case when :G_REST_BASE is not null and o.status = 'ENABLED' then :G_REST_BASE || '/' || o.object_alias || '/' end;
                         p('<tr><td><a class="rst-strong" href="' || apex_page.get_url(p_page => 51, p_items => 'P51_ID', p_values => o.id, p_clear_cache => '51') || '">'
                           || apex_escape.html(o.parsing_object) || '</a></td>'
                           || '<td>' || apex_escape.html(initcap(o.type)) || '</td>'
                           || '<td><span class="rst-status rst-status--' || case o.status when 'ENABLED' then 'on">Enabled' else 'off">Disabled' end || '</span></td>'
                           || '<td>' || case o.auto_rest_auth when 'ENABLED' then '<span class="fa fa-lock" aria-hidden="true"></span> Authorization required' else '<span class="rst-muted">Public</span>' end || '</td>'
-                          || '<td>' || case when l_url is not null then '<a class="rst-path" target="_blank" rel="noopener" href="' || apex_escape.html_attribute(l_url) || '">' || apex_escape.html(l_url) || '</a>' end || '</td>'
-                          || '<td><span title="' || apex_escape.html_attribute(o.updated_by) || '">' || apex_escape.html(apex_util.get_since(o.updated_on)) || '</span></td></tr>');
+                          || '<td>' || case when l_url is not null then '<a class="rst-path" target="_blank" rel="noopener" href="' || apex_escape.html_attribute(l_url) || '">' || apex_escape.html(l_url) || '</a>' end || '</td></tr>');
                     end loop;
                     p('</tbody></table>');
                     if l_count = 0 then

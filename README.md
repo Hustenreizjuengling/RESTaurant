@@ -260,6 +260,19 @@ The first start installs APEX into the database and takes a while. `dev/setup/wo
 workspace `RESTAURANT` with the schema of the same name and the developer `DEV`; the passwords are in the script and
 are meant for a local sandbox only.
 
+### Tests
+
+`tests/e2e` plays the application through in a browser, the way a user would: it starts with a schema that has no REST
+definitions, builds a service, calls it over HTTP, protects it, exports and imports it into a second schema, breaks
+and repairs it, and removes everything again. It also covers the error cases of every form, a schema with more than
+300 handlers and a copy of the application whose `IST_ADMIN` returns no row.
+
+```
+scripts/dev.sh test          # reset the test schemas, install dist/restaurant.sql, run all checks
+```
+
+The run needs Node.js and the sandbox, and installs Playwright on first use.
+
 ```
 src/                    APEXlang source of the application
   pages/                one file per page
@@ -268,6 +281,7 @@ dist/restaurant.sql     single file installer
 install.sql             command line installer
 docs/                   exchange format, JSON schema, screenshots
 examples/               sample exports
+tests/e2e/              end-to-end walkthrough
 dev/                    local sandbox and sample services
 ```
 
@@ -276,6 +290,8 @@ dev/                    local sandbox and sample services
 - Handlers support the methods GET, POST, PUT and DELETE.
 - Saving a module after changing its pagination size or its comments defines the module again. Its templates and
   handlers are written back unchanged, but their change date is the time of the save.
+- ORDS needs a moment to notice some changes. After such a save a service can answer with 404 for about a second,
+  and an AutoREST object stays reachable under its old alias for a few seconds.
 - The request console sends the request from your browser, without the session cookies of the application. For a
   protected service, add an `Authorization` header.
 - ORDS records the database user in its audit columns. Changes made through APEX show the APEX public user there.

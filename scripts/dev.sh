@@ -5,6 +5,7 @@
 #   scripts/dev.sh import            validate and import src/ into the sandbox
 #   scripts/dev.sh export            write the single-file installer to dist/
 #   scripts/dev.sh sql [file]        open SQLcl as the parsing schema (or run a file)
+#   scripts/dev.sh test              play the application through, see tests/e2e
 set -euo pipefail
 
 CONTAINER="${RESTAURANT_ORDS_CONTAINER:-restaurant-dev-ords-1}"
@@ -36,6 +37,10 @@ case "${1:-}" in
       docker exec -it "$CONTAINER" sql "$CONNECT"
     fi
     ;;
+  test)
+    shift
+    "$(dirname "$0")/../tests/e2e/run.sh" "$@"
+    ;;
   *)
-    sed -n '2,8p' "$0"; exit 2 ;;
+    sed -n '2,9p' "$0"; exit 2 ;;
 esac

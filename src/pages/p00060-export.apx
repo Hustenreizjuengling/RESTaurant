@@ -88,11 +88,14 @@ page 60 (
                     c_limit constant pls_integer := 200000;
                     l_html  clob;
                 begin
-                    for d in ( select c002 file_name, clob001 content, dbms_lob.getlength(clob001) length
+                    for d in ( select c002 file_name, c003 message, clob001 content, dbms_lob.getlength(clob001) length
                                  from apex_collections
                                 where collection_name = 'RESTAURANT_DOC'
                                   and c001 = 'EXPORT' )
                     loop
+                        if d.file_name is null then
+                            return to_clob('<div class="rst-empty"><p class="rst-muted">' || apex_escape.html(d.message) || '</p></div>');
+                        end if;
                         l_html := '<div class="rst-toolbar"><span class="fa fa-file-code-o" aria-hidden="true"></span> <span class="rst-mono rst-strong">'
                             || apex_escape.html(d.file_name) || '</span><span class="rst-muted">' || to_char(d.length, 'fm999G999G999G990') || ' characters'
                             || case when d.file_name like '%.zip' then ' · the archive contains this content as one file per module' end
@@ -349,6 +352,32 @@ page 60 (
         }
         advanced {
             executionMappingIdentifier: 6001
+        }
+    )
+
+    process require-modules (
+        name: Require Modules
+        type: executeCode
+        source {
+            plsqlCode:
+                ```plsql
+                if :P60_SCOPE = 'MODULES' and :P60_MODULES is null then
+                    apex_error.add_error(
+                        p_message          => 'Select at least one module to export.',
+                        p_display_location => apex_error.c_inline_with_field_and_notif,
+                        p_page_item_name   => 'P60_MODULES' );
+                end if;
+                ```
+        }
+        execution {
+            sequence: 10
+        }
+        serverSideCondition {
+            type: request=Value
+            value: DOWNLOAD
+        }
+        advanced {
+            executionMappingIdentifier: 6002
         }
     )
 

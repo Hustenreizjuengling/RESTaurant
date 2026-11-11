@@ -89,7 +89,7 @@ page 1 (
                                       ( select count(*) from user_ords_privileges where schema_id = l_schema_id and name not like 'oracle.%' ) privileges,
                                       ( select count(*) from user_ords_roles where schema_id = l_schema_id and name not like 'oracle.%' ) roles,
                                       ( select count(*) from user_ords_clients ) clients,
-                                      ( select count(*) from user_ords_enabled_objects ) objects
+                                      ( select count(*) from user_ords_objects where id is not null ) objects
                                  from dual )
                     loop
                         tile(10, 'fa-cubes', s.modules, 'Modules', case when s.unpublished > 0 then s.unpublished || ' not published' end);
