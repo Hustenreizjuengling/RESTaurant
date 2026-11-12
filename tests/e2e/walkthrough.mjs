@@ -252,6 +252,19 @@ await run('6  Handlers and the code editor', async () => {
   await page.locator('.rst-try-curl').click();
   equal('the request can be copied as cURL', await clipboard(), `curl -i -X GET '${cfg.ords}/${A}/shop/v1/products/'`);
 
+  // a response that is one long line, JSON that is not announced as JSON
+  const width = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth
+    + ' ' + Math.round(document.querySelector('.rst-try-send').getBoundingClientRect().left));
+  const widthBefore = await width();
+  const longLine = JSON.stringify({ text: 'x'.repeat(5000), items: Array.from({ length: 300 }, (v, i) => ({ id: i, name: 'Product ' + i })) });
+  await context.route(`**/${A}/shop/v1/products/`, route => route.fulfill({ status: 200, contentType: 'text/html', body: longLine }));
+  await page.locator('.rst-try-send').click();
+  await page.waitForFunction(() => document.querySelector('.rst-try-info').textContent.includes('text/html'), null, { timeout: 15000 });
+  await context.unroute(`**/${A}/shop/v1/products/`);
+  equal('a long response line does not widen the page or move the buttons', await width(), widthBefore);
+  check('the long line is wrapped inside of the response box', await page.locator('.rst-try-output').evaluate(e => e.scrollWidth <= e.clientWidth));
+  contains('JSON is formatted even without a JSON content type', await page.locator('.rst-try-output').innerText(), '\n  "items": [\n');
+
   // compile check
   await app.editor();
   await app.setSource('select product_id, nope\n  from products');

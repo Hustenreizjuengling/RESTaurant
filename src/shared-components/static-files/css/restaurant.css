@@ -196,7 +196,8 @@ a.rst-stat:hover, a.rst-stat:focus { border-color: var(--rst-accent); transform:
 .rst-kv dd { margin: 0; overflow-wrap: anywhere; }
 
 /* ---------- request console ---------- */
-.rst-try { display: grid; gap: .75rem; }
+/* the column must not grow with its content: a long line of the response would widen the page */
+.rst-try { display: grid; grid-template-columns: minmax(0, 1fr); gap: .75rem; }
 .rst-try-bar { display: flex; gap: .5rem; align-items: center; }
 .rst-try-bar input { flex: 1 1 auto; min-width: 0; font-family: var(--rst-mono); font-size: .8125rem; }
 .rst-try input, .rst-try textarea {
@@ -214,6 +215,10 @@ a.rst-stat:hover, a.rst-stat:focus { border-color: var(--rst-accent); transform:
 .rst-try-code.is-ok { background: var(--rst-get); }
 .rst-try-code.is-redirect { background: var(--rst-post); }
 .rst-try-code.is-error { background: var(--rst-delete); }
+/* responses often come as one long line: wrap them and scroll inside of the box */
+pre.rst-try-output, pre.rst-try-response-headers { white-space: pre-wrap; overflow-wrap: anywhere; }
+.rst-try-output { max-height: 20rem; }
+.rst-try-response-headers { max-height: 10rem; margin-bottom: .5rem; }
 
 @media (max-width: 640px) {
   .rst-try-grid { grid-template-columns: 1fr; }
@@ -273,8 +278,6 @@ a.rst-stat:hover, a.rst-stat:focus { border-color: var(--rst-accent); transform:
 .rst-about img { border-radius: 16px; }
 .rst-about h2 { margin: 0 0 .25rem; font-size: 1.25rem; }
 .rst-about p { margin: 0; }
-.rst-try-output { max-height: 20rem; }
-.rst-try-response-headers { max-height: 10rem; margin-bottom: .5rem; }
 
 /* ---------- code editor and compile check ---------- */
 .rst-monaco {

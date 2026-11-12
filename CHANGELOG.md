@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.2
+
+- A long line in the response of the request console is wrapped; it no longer widens the page and moves the buttons
+- The request console formats JSON also when the handler does not send a JSON content type
+
 ## 1.1.1
 
 Found by playing the whole application through, see `tests/e2e`.

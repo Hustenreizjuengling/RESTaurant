@@ -482,7 +482,8 @@
                 return response.text().then(function (text) {
                     var lines = [], pretty = text, type = response.headers.get("content-type") || "";
                     response.headers.forEach(function (value, name) { lines.push(name + ": " + value); });
-                    if (type.indexOf("json") >= 0) {
+                    // PL/SQL handlers often print JSON without saying so in the content type
+                    if (type.indexOf("json") >= 0 || /^\s*[{[]/.test(text)) {
                         try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch (e) { /* keep the text */ }
                     }
                     show(response.status, response.statusText,

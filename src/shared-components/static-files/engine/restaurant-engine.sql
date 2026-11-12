@@ -14,7 +14,7 @@
 --   :message  success message of the operation (out)
 --------------------------------------------------------------------------------
 declare
-    c_app_version    constant varchar2(20) := '1.1.1';
+    c_app_version    constant varchar2(20) := '1.1.2';
     c_format         constant varchar2(30) := 'restaurant-ords';
     c_format_version constant pls_integer  := 1;
     c_doc            constant varchar2(30) := 'RESTAURANT_DOC';
